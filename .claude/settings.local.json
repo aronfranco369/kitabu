@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"d:\\\\Projects\\\\books\\\\kitabu\"; flutter analyze --no-pub 2>&1 | Out-String | Select-String \"error\" -AllMatches | ForEach-Object { $_.Matches } | Select-Object -First 5)",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}
