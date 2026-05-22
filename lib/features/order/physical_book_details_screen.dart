@@ -10,8 +10,8 @@ import '../../core/widgets/book_cover.dart';
 import '../../data/repositories.dart';
 
 class PhysicalBookDetailsScreen extends ConsumerWidget {
-  const PhysicalBookDetailsScreen({super.key, required this.slug});
-  final String slug;
+  const PhysicalBookDetailsScreen({super.key, required this.id});
+  final String id;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -19,7 +19,7 @@ class PhysicalBookDetailsScreen extends ConsumerWidget {
       data: KitabuTheme.clay(),
       child: Builder(builder: (ctx) {
         final k = ctx.kit;
-        final bookAsync = ref.watch(bookBySlugProvider(slug));
+        final bookAsync = ref.watch(bookByIdProvider(id));
 
         return bookAsync.when(
           loading: () => Scaffold(
@@ -40,6 +40,7 @@ class PhysicalBookDetailsScreen extends ConsumerWidget {
                 body: const Center(child: Text('Book not found')),
               );
             }
+            final displayPrice = book.discountPrice ?? book.price;
             return Scaffold(
               backgroundColor: k.bg,
               appBar: BackTopBar(
@@ -57,8 +58,7 @@ class PhysicalBookDetailsScreen extends ConsumerWidget {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(book.title,
                                   style: KitabuText.ui(16,
@@ -71,25 +71,28 @@ class PhysicalBookDetailsScreen extends ConsumerWidget {
                                   style: KitabuText.ui(13,
                                       color: k.muted)),
                               const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  KSvg(KIcons.starFilled,
-                                      size: 13, color: k.gold),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                      book.rating.toStringAsFixed(1),
-                                      style: KitabuText.ui(13,
-                                          weight: FontWeight.w600,
-                                          color: k.ink)),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
+                              if (book.year != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text('${book.year}',
+                                      style: KitabuText.ui(12,
+                                          color: k.muted)),
+                                ),
                               Text(
-                                'KES ${book.physicalPrice!.toStringAsFixed(0)}',
+                                'KES ${displayPrice.toStringAsFixed(0)}',
                                 style: KitabuText.ui(20,
                                     weight: FontWeight.w900,
                                     color: k.accent),
                               ),
+                              if (book.discountPrice != null)
+                                Text(
+                                  'KES ${book.price.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: k.muted,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -101,7 +104,7 @@ class PhysicalBookDetailsScreen extends ConsumerWidget {
                       style: KitabuText.ui(15,
                           weight: FontWeight.w700, color: k.ink)),
                   const SizedBox(height: 12),
-                  _QuantityPicker(price: book.physicalPrice!),
+                  _QuantityPicker(price: displayPrice),
                   const SizedBox(height: 20),
                   Divider(color: k.hairline),
                   const SizedBox(height: 16),

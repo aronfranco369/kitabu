@@ -46,41 +46,34 @@ class OrderScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                       kGutter, 8, kGutter, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: k.accent.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: k.accent.withValues(alpha: 0.25)),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: k.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: k.accent.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        KSvg(KIcons.truck, size: 22, color: k.accent),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Free delivery on orders over KES 3,000',
+                                  style: KitabuText.ui(13,
+                                      weight: FontWeight.w600,
+                                      color: k.ink)),
+                              Text('Nairobi & major towns',
+                                  style: KitabuText.ui(11,
+                                      color: k.muted)),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            KSvg(KIcons.truck,
-                                size: 22, color: k.accent),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text('Free delivery on orders over KES 3,000',
-                                      style: KitabuText.ui(13,
-                                          weight: FontWeight.w600,
-                                          color: k.ink)),
-                                  Text('Nairobi & major towns',
-                                      style: KitabuText.ui(11,
-                                          color: k.muted)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -100,16 +93,20 @@ class OrderScreen extends ConsumerWidget {
                   child: Center(child: Text('Error: $e')),
                 ),
                 data: (books) {
-                  final physical =
-                      books.where((b) => b.physicalPrice != null).toList();
+                  final orderable =
+                      books.where((b) => !b.isFree && b.price > 0).toList();
+                  if (orderable.isEmpty) {
+                    return const SliverToBoxAdapter(
+                      child: Center(child: Text('No books available for order')),
+                    );
+                  }
                   return SliverPadding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: kGutter),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (c, i) => _PhysicalBookCard(
-                            book: physical[i]),
-                        childCount: physical.length,
+                        (c, i) => _PhysicalBookCard(book: orderable[i]),
+                        childCount: orderable.length,
                       ),
                     ),
                   );
@@ -134,7 +131,7 @@ class _PhysicalBookCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: KCard(
-        onTap: () => context.push('/order/book/${book.slug}'),
+        onTap: () => context.push('/order/book/${book.id}'),
         child: Row(
           children: [
             BookCover(book, width: 72, height: 104, badge: false),
@@ -155,10 +152,21 @@ class _PhysicalBookCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'KES ${book.physicalPrice!.toStringAsFixed(0)}',
+                        'KES ${(book.discountPrice ?? book.price).toStringAsFixed(0)}',
                         style: KitabuText.ui(15,
                             weight: FontWeight.w800, color: k.accent),
                       ),
+                      if (book.discountPrice != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          'KES ${book.price.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: k.muted,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(

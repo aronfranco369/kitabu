@@ -37,14 +37,16 @@ final appRouter = GoRouter(
                   GoRoute(
                     path: 'results',
                     builder: (_, state) => SearchResultsScreen(
-                        query: state.uri.queryParameters['q'] ?? ''),
+                      query: state.uri.queryParameters['q'] ?? '',
+                      category: state.uri.queryParameters['cat'],
+                    ),
                   ),
                 ],
               ),
               GoRoute(
-                path: 'book/:slug',
+                path: 'book/:id',
                 pageBuilder: (_, state) => _slide(
-                  BookDetailsScreen(slug: state.pathParameters['slug']!),
+                  BookDetailsScreen(id: state.pathParameters['id']!),
                 ),
               ),
             ],
@@ -57,10 +59,10 @@ final appRouter = GoRouter(
             builder: (_, __) => const OrderScreen(),
             routes: [
               GoRoute(
-                path: 'book/:slug',
+                path: 'book/:id',
                 pageBuilder: (_, state) => _slide(
                   PhysicalBookDetailsScreen(
-                      slug: state.pathParameters['slug']!),
+                      id: state.pathParameters['id']!),
                 ),
               ),
               GoRoute(
@@ -109,9 +111,9 @@ final appRouter = GoRouter(
             builder: (_, __) => const LibraryScreen(),
             routes: [
               GoRoute(
-                path: 'read/:slug',
+                path: 'read/:id',
                 pageBuilder: (_, state) => _slide(
-                  ReaderScreen(slug: state.pathParameters['slug']!),
+                  ReaderScreen(id: state.pathParameters['id']!),
                 ),
               ),
             ],

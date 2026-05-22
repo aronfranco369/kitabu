@@ -10,18 +10,24 @@ import '../../data/models.dart';
 import '../../data/repositories.dart';
 
 class SearchResultsScreen extends ConsumerWidget {
-  const SearchResultsScreen({super.key, required this.query});
+  const SearchResultsScreen({super.key, required this.query, this.category});
   final String query;
+  final String? category;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final k = context.kit;
-    final resultsAsync = ref.watch(searchBooksProvider(query));
+    final String title = category != null && category!.isNotEmpty
+        ? category![0].toUpperCase() + category!.substring(1).replaceAll('-', ' ')
+        : '"$query"';
+    final resultsAsync = category != null && category!.isNotEmpty
+        ? ref.watch(booksByCategoryProvider(category!))
+        : ref.watch(searchBooksProvider(query));
 
     return Scaffold(
       backgroundColor: k.bg,
       appBar: BackTopBar(
-        title: '"$query"',
+        title: title,
         onBack: () => context.pop(),
       ),
       body: resultsAsync.when(
@@ -34,8 +40,7 @@ class SearchResultsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  KSvg(KIcons.search, size: 48,
-                      color: k.muted2),
+                  KSvg(KIcons.search, size: 48, color: k.muted2),
                   const SizedBox(height: 16),
                   Text('No results for "$query"',
                       style: KitabuText.ui(16,
@@ -75,7 +80,7 @@ class _BookRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final k = context.kit;
     return GestureDetector(
-      onTap: () => context.push('/home/book/${book.slug}'),
+      onTap: () => context.push('/home/book/${book.id}'),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
@@ -103,18 +108,15 @@ class _BookRow extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      KSvg(KIcons.starFilled,
-                          size: 12, color: k.gold),
-                      const SizedBox(width: 4),
-                      Text(book.rating.toStringAsFixed(1),
-                          style: KitabuText.ui(12,
-                              weight: FontWeight.w600,
-                              color: k.ink)),
-                      const SizedBox(width: 4),
-                      Dot(color: k.muted2),
-                      const SizedBox(width: 4),
                       Text('${book.pageCount} pp',
                           style: KitabuText.ui(11, color: k.muted)),
+                      if (book.year != null) ...[
+                        const SizedBox(width: 6),
+                        Dot(color: k.muted2),
+                        const SizedBox(width: 6),
+                        Text('${book.year}',
+                            style: KitabuText.ui(11, color: k.muted)),
+                      ],
                     ],
                   ),
                 ],

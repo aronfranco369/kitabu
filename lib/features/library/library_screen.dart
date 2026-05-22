@@ -105,7 +105,7 @@ class _LibraryCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () => context.push('/library/read/${b.slug}'),
+        onTap: () => context.push('/library/read/${b.id}'),
         child: KCard(
           child: Row(
             children: [

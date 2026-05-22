@@ -9,13 +9,13 @@ import '../../core/widgets/book_cover.dart';
 import '../../data/repositories.dart';
 
 class BookDetailsScreen extends ConsumerWidget {
-  const BookDetailsScreen({super.key, required this.slug});
-  final String slug;
+  const BookDetailsScreen({super.key, required this.id});
+  final String id;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final k = context.kit;
-    final bookAsync = ref.watch(bookBySlugProvider(slug));
+    final bookAsync = ref.watch(bookByIdProvider(id));
 
     return bookAsync.when(
       loading: () => Scaffold(
@@ -88,35 +88,30 @@ class BookDetailsScreen extends ConsumerWidget {
                             weight: FontWeight.w800, color: k.ink)),
                     const SizedBox(height: 6),
                     Text(book.author,
-                        style:
-                            KitabuText.ui(15, color: k.muted)),
+                        style: KitabuText.ui(15, color: k.muted)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        KSvg(KIcons.starFilled,
-                            size: 14, color: k.gold),
-                        const SizedBox(width: 5),
-                        Text(book.rating.toStringAsFixed(1),
-                            style: KitabuText.ui(14,
-                                weight: FontWeight.w700,
-                                color: k.ink)),
-                        const SizedBox(width: 4),
-                        Text('(${book.reviewCount})',
-                            style: KitabuText.ui(13,
-                                color: k.muted)),
-                        const SizedBox(width: 14),
-                        Dot(color: k.muted2),
-                        const SizedBox(width: 14),
                         Text('${book.pageCount} pages',
-                            style: KitabuText.ui(13,
-                                color: k.muted)),
-                        if (book.publishedYear != null) ...[
+                            style: KitabuText.ui(13, color: k.muted)),
+                        if (book.year != null) ...[
                           const SizedBox(width: 14),
                           Dot(color: k.muted2),
                           const SizedBox(width: 14),
-                          Text('${book.publishedYear}',
-                              style: KitabuText.ui(13,
-                                  color: k.muted)),
+                          Text('${book.year}',
+                              style: KitabuText.ui(13, color: k.muted)),
+                        ],
+                        if (!book.isFree && book.price > 0) ...[
+                          const SizedBox(width: 14),
+                          Dot(color: k.muted2),
+                          const SizedBox(width: 14),
+                          Text(
+                            book.discountPrice != null
+                                ? 'KES ${book.discountPrice!.toStringAsFixed(0)}'
+                                : 'KES ${book.price.toStringAsFixed(0)}',
+                            style: KitabuText.ui(13,
+                                weight: FontWeight.w700, color: k.accent),
+                          ),
                         ],
                       ],
                     ),
@@ -135,18 +130,17 @@ class BookDetailsScreen extends ConsumerWidget {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: book.tags
-                            .map((t) => KChip(t))
-                            .toList(),
+                        children: book.tags.map((t) => KChip(t)).toList(),
                       ),
                       const SizedBox(height: 20),
                     ],
                     Divider(color: k.hairline),
                     const SizedBox(height: 16),
-                    _InfoRow('Language', book.language),
-                    if (book.publisher != null)
-                      _InfoRow('Publisher', book.publisher!),
                     _InfoRow('Category', book.category),
+                    if (book.fileFormat != null)
+                      _InfoRow('Format', book.fileFormat!.toUpperCase()),
+                    if (book.downloadCount > 0)
+                      _InfoRow('Downloads', '${book.downloadCount}'),
                     const SizedBox(height: 100),
                   ]),
                 ),
@@ -156,15 +150,13 @@ class BookDetailsScreen extends ConsumerWidget {
           bottomNavigationBar: StickyBottom(
             child: Row(
               children: [
-                if (book.physicalPrice != null) ...[
+                if (!book.isFree && book.price > 0) ...[
                   Expanded(
                     child: Cta(
                       'Order Physical',
                       variant: CtaVariant.secondary,
-                      icon: KSvg(KIcons.box, size: 16,
-                          color: k.accent),
-                      onTap: () => context
-                          .push('/order/book/${book.slug}'),
+                      icon: KSvg(KIcons.box, size: 16, color: k.accent),
+                      onTap: () => context.push('/order/book/${book.id}'),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -175,7 +167,7 @@ class BookDetailsScreen extends ConsumerWidget {
                     icon: KSvg(KIcons.bookOpen, size: 16,
                         color: Colors.white),
                     onTap: () =>
-                        context.push('/library/read/${book.slug}'),
+                        context.push('/library/read/${book.id}'),
                   ),
                 ),
               ],

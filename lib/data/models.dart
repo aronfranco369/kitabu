@@ -1,69 +1,67 @@
 class Book {
   const Book({
     required this.id,
-    required this.slug,
     required this.title,
     required this.author,
     required this.description,
     required this.category,
-    required this.rating,
-    required this.reviewCount,
-    required this.pageCount,
     required this.isFree,
-    required this.digitalPrice,
-    this.physicalPrice,
+    required this.price,
+    this.discountPrice,
     this.coverUrl,
-    this.language = 'English',
-    this.publishedYear,
-    this.publisher,
+    this.year,
     this.tags = const [],
-    this.readProgress = 0.0,
+    this.fileUrl,
+    this.fileFormat,
+    this.isDownloadable = false,
+    this.fileSize = 0,
+    this.pageCount = 0,
+    this.viewCount = 0,
+    this.downloadCount = 0,
   });
 
-  final int id;
-  final String slug;
+  final String id;
   final String title;
   final String author;
   final String description;
   final String category;
-  final double rating;
-  final int reviewCount;
-  final int pageCount;
   final bool isFree;
-  final double digitalPrice;
-  final double? physicalPrice;
+  final double price;
+  final double? discountPrice;
   final String? coverUrl;
-  final String language;
-  final int? publishedYear;
-  final String? publisher;
+  final int? year;
   final List<String> tags;
-  final double readProgress;
+  final String? fileUrl;
+  final String? fileFormat;
+  final bool isDownloadable;
+  final int fileSize;
+  final int pageCount;
+  final int viewCount;
+  final int downloadCount;
 
   factory Book.fromMap(Map<String, dynamic> m) => Book(
-        id: m['id'] as int,
-        slug: m['slug'] as String,
-        title: m['title'] as String,
-        author: m['author'] as String,
-        description: m['description'] as String,
-        category: m['category'] as String,
-        rating: (m['rating'] as num).toDouble(),
-        reviewCount: m['review_count'] as int,
-        pageCount: m['page_count'] as int,
-        isFree: m['is_free'] as bool,
-        digitalPrice: (m['digital_price'] as num).toDouble(),
-        physicalPrice: m['physical_price'] != null
-            ? (m['physical_price'] as num).toDouble()
+        id: m['id'] as String,
+        title: m['title'] as String? ?? '',
+        author: m['author'] as String? ?? '',
+        description: m['description'] as String? ?? '',
+        category: m['category'] as String? ?? '',
+        isFree: m['is_free'] as bool? ?? false,
+        price: m['price'] != null ? (m['price'] as num).toDouble() : 0.0,
+        discountPrice: m['discount_price'] != null
+            ? (m['discount_price'] as num).toDouble()
             : null,
         coverUrl: m['cover_url'] as String?,
-        language: m['language'] as String? ?? 'English',
-        publishedYear: m['published_year'] as int?,
-        publisher: m['publisher'] as String?,
+        year: m['year'] as int?,
         tags: m['tags'] != null
             ? List<String>.from(m['tags'] as List)
             : const [],
-        readProgress: m['read_progress'] != null
-            ? (m['read_progress'] as num).toDouble()
-            : 0.0,
+        fileUrl: m['file_url'] as String?,
+        fileFormat: m['file_format'] as String?,
+        isDownloadable: m['is_downloadable'] as bool? ?? false,
+        fileSize: (m['file_size'] as num?)?.toInt() ?? 0,
+        pageCount: m['page_count'] as int? ?? 0,
+        viewCount: m['view_count'] as int? ?? 0,
+        downloadCount: m['download_count'] as int? ?? 0,
       );
 }
 
@@ -83,17 +81,6 @@ class Category {
   final String icon;
   final int color;
   final int bookCount;
-
-  factory Category.fromMap(Map<String, dynamic> m) => Category(
-        id: m['id'] as int,
-        slug: m['slug'] as String,
-        name: m['name'] as String,
-        icon: m['icon'] as String,
-        color: m['color'] is String
-            ? int.parse((m['color'] as String).replaceAll('#', '0xFF'))
-            : m['color'] as int,
-        bookCount: m['book_count'] as int? ?? 0,
-      );
 }
 
 class LibraryEntry {
@@ -164,13 +151,13 @@ class RequestEvent {
     required this.createdAt,
   });
 
-  final int id;
+  final String id;
   final RequestStatus status;
   final String note;
   final DateTime createdAt;
 
   factory RequestEvent.fromMap(Map<String, dynamic> m) => RequestEvent(
-        id: m['id'] as int,
+        id: m['id'].toString(),
         status: requestStatusFromString(m['status'] as String),
         note: m['note'] as String? ?? '',
         createdAt: DateTime.parse(m['created_at'] as String),
@@ -203,11 +190,10 @@ class BookRequest {
         note: m['note'] as String? ?? '',
         status: requestStatusFromString(m['status'] as String? ?? 'pending'),
         createdAt: DateTime.parse(m['created_at'] as String),
-        events: m['events'] != null
-            ? (m['events'] as List)
-                .map((e) => RequestEvent.fromMap(e as Map<String, dynamic>))
-                .toList()
-            : [],
+        events: (m['request_events'] as List?)
+                ?.map((e) => RequestEvent.fromMap(e as Map<String, dynamic>))
+                .toList() ??
+            [],
       );
 }
 
@@ -218,14 +204,14 @@ class OrderStep {
     required this.completedAt,
   });
 
-  final int id;
+  final String id;
   final String label;
   final DateTime? completedAt;
 
   bool get isComplete => completedAt != null;
 
   factory OrderStep.fromMap(Map<String, dynamic> m) => OrderStep(
-        id: m['id'] as int,
+        id: m['id'].toString(),
         label: m['label'] as String,
         completedAt: m['completed_at'] != null
             ? DateTime.parse(m['completed_at'] as String)
@@ -266,11 +252,10 @@ class PhysicalOrder {
         totalPrice: (m['total_price'] as num).toDouble(),
         status: m['status'] as String,
         createdAt: DateTime.parse(m['created_at'] as String),
-        steps: m['steps'] != null
-            ? (m['steps'] as List)
-                .map((e) => OrderStep.fromMap(e as Map<String, dynamic>))
-                .toList()
-            : [],
+        steps: (m['order_steps'] as List?)
+                ?.map((e) => OrderStep.fromMap(e as Map<String, dynamic>))
+                .toList() ??
+            [],
         trackingNumber: m['tracking_number'] as String?,
         estimatedDelivery: m['estimated_delivery'] != null
             ? DateTime.parse(m['estimated_delivery'] as String)

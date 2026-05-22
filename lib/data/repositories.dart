@@ -1,56 +1,61 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../core/config/env.dart';
 import 'models.dart';
-import 'fixtures.dart';
 
-SupabaseClient? get _db => Env.hasSupabase ? Supabase.instance.client : null;
+SupabaseClient get _db => Supabase.instance.client;
+
+// ── Category metadata ─────────────────────────────────────────────────────────
+
+const _categoryMeta = <String, (String icon, int color)>{
+  'fiction':     ('📖', 0xFFC0532B),
+  'historical':  ('🏛️', 0xFF1A3A5C),
+  'thriller':    ('🔍', 0xFF6B4C8A),
+  'non-fiction': ('📚', 0xFF2E7D4E),
+  'nonfiction':  ('📚', 0xFF2E7D4E),
+  'education':   ('🎓', 0xFFB8723A),
+  'biography':   ('👤', 0xFF8A3A4A),
+  'memoir':      ('✍️', 0xFF5C7A2E),
+  'poetry':      ('🎵', 0xFF2A6B8A),
+  'science':     ('🔬', 0xFF1A5C34),
+  'politics':    ('🏛️', 0xFF4A2E6A),
+};
+
+String _categoryName(String slug) {
+  if (slug.isEmpty) return '';
+  return slug[0].toUpperCase() + slug.substring(1).replaceAll('-', ' ');
+}
 
 // ── BookRepository ────────────────────────────────────────────────────────────
 
 class BookRepository {
   Future<List<Book>> fetchAll() async {
-    if (_db == null) return kBooks;
-    final rows = await _db!.from('books').select().order('title');
+    final rows = await _db.from('books').select().order('title');
     return rows.map((r) => Book.fromMap(r)).toList();
   }
 
-  Future<Book?> fetchBySlug(String slug) async {
-    if (_db == null) return kBooksBySlug[slug];
-    final rows =
-        await _db!.from('books').select().eq('slug', slug).limit(1);
+  Future<Book?> fetchById(String id) async {
+    final rows = await _db.from('books').select().eq('id', id).limit(1);
     if (rows.isEmpty) return null;
     return Book.fromMap(rows.first);
   }
 
   Future<List<Book>> fetchByCategory(String category) async {
-    if (_db == null) {
-      return kBooks.where((b) => b.category == category).toList();
-    }
-    final rows = await _db!
+    final rows = await _db
         .from('books')
         .select()
         .eq('category', category)
-        .order('rating', ascending: false);
+        .order('download_count', ascending: false);
     return rows.map((r) => Book.fromMap(r)).toList();
   }
 
   Future<List<Book>> search(String query) async {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return [];
-    if (_db == null) {
-      return kBooks
-          .where((b) =>
-              b.title.toLowerCase().contains(q) ||
-              b.author.toLowerCase().contains(q) ||
-              b.tags.any((t) => t.toLowerCase().contains(q)))
-          .toList();
-    }
-    final rows = await _db!
+    final rows = await _db
         .from('books')
         .select()
         .or('title.ilike.%$q%,author.ilike.%$q%')
-        .order('rating', ascending: false);
+        .order('download_count', ascending: false);
     return rows.map((r) => Book.fromMap(r)).toList();
   }
 }
@@ -59,10 +64,27 @@ class BookRepository {
 
 class CategoryRepository {
   Future<List<Category>> fetchAll() async {
-    if (_db == null) return kCategories;
-    final rows =
-        await _db!.from('categories').select().order('name');
-    return rows.map((r) => Category.fromMap(r)).toList();
+    final rows = await _db.from('books').select('category');
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final cat = (row['category'] as String?)?.trim().toLowerCase() ?? '';
+      if (cat.isNotEmpty) counts[cat] = (counts[cat] ?? 0) + 1;
+    }
+    final categories = <Category>[];
+    int i = 0;
+    for (final entry in counts.entries) {
+      final (icon, color) = _categoryMeta[entry.key] ?? ('📚', 0xFF1A3A5C);
+      categories.add(Category(
+        id: i++,
+        slug: entry.key,
+        name: _categoryName(entry.key),
+        icon: icon,
+        color: color,
+        bookCount: entry.value,
+      ));
+    }
+    categories.sort((a, b) => a.name.compareTo(b.name));
+    return categories;
   }
 }
 
@@ -70,8 +92,7 @@ class CategoryRepository {
 
 class LibraryRepository {
   Future<List<LibraryEntry>> fetchLibrary() async {
-    if (_db == null) return kLibrary;
-    final rows = await _db!
+    final rows = await _db
         .from('library')
         .select('*, books(*)')
         .order('last_read_at', ascending: false);
@@ -86,8 +107,7 @@ class LibraryRepository {
 
 class RequestRepository {
   Future<List<BookRequest>> fetchAll() async {
-    if (_db == null) return kRequests;
-    final rows = await _db!
+    final rows = await _db
         .from('requests')
         .select('*, request_events(*)')
         .order('created_at', ascending: false);
@@ -95,14 +115,7 @@ class RequestRepository {
   }
 
   Future<BookRequest?> fetchById(String id) async {
-    if (_db == null) {
-      try {
-        return kRequests.firstWhere((r) => r.id == id);
-      } catch (_) {
-        return null;
-      }
-    }
-    final rows = await _db!
+    final rows = await _db
         .from('requests')
         .select('*, request_events(*)')
         .eq('id', id)
@@ -116,8 +129,7 @@ class RequestRepository {
     required String author,
     required String note,
   }) async {
-    if (_db == null) return;
-    await _db!.from('requests').insert({
+    await _db.from('requests').insert({
       'title': title,
       'author': author,
       'note': note,
@@ -130,8 +142,7 @@ class RequestRepository {
 
 class OrderRepository {
   Future<List<PhysicalOrder>> fetchAll() async {
-    if (_db == null) return kOrders;
-    final rows = await _db!
+    final rows = await _db
         .from('orders')
         .select('*, books(*), order_steps(*)')
         .order('created_at', ascending: false);
@@ -142,21 +153,13 @@ class OrderRepository {
   }
 
   Future<PhysicalOrder?> fetchById(String id) async {
-    if (_db == null) {
-      try {
-        return kOrders.firstWhere((o) => o.id == id);
-      } catch (_) {
-        return null;
-      }
-    }
-    final rows = await _db!
+    final rows = await _db
         .from('orders')
         .select('*, books(*), order_steps(*)')
         .eq('id', id)
         .limit(1);
     if (rows.isEmpty) return null;
-    final b =
-        Book.fromMap(rows.first['books'] as Map<String, dynamic>);
+    final b = Book.fromMap(rows.first['books'] as Map<String, dynamic>);
     return PhysicalOrder.fromMap(rows.first, b);
   }
 }
@@ -179,9 +182,9 @@ final booksByCategoryProvider =
     FutureProvider.family<List<Book>, String>((ref, category) =>
         ref.watch(bookRepoProvider).fetchByCategory(category));
 
-final bookBySlugProvider =
-    FutureProvider.family<Book?, String>((ref, slug) =>
-        ref.watch(bookRepoProvider).fetchBySlug(slug));
+final bookByIdProvider =
+    FutureProvider.family<Book?, String>((ref, id) =>
+        ref.watch(bookRepoProvider).fetchById(id));
 
 final searchBooksProvider =
     FutureProvider.family<List<Book>, String>((ref, query) =>

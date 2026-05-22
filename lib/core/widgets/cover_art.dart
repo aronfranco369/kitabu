@@ -10,7 +10,7 @@ class CoverArt extends StatelessWidget {
     this.radius = 8.0,
   });
 
-  final int seed;
+  final String seed;
   final double width;
   final double height;
   final double radius;
@@ -28,7 +28,8 @@ class CoverArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rng = Random(seed);
+    final hash = seed.hashCode.abs();
+    final rng = Random(hash);
     final paletteIdx = rng.nextInt(_palettes.length);
     final palette = _palettes[paletteIdx];
     final motif = rng.nextInt(16);
@@ -42,7 +43,7 @@ class CoverArt extends StatelessWidget {
           deep: palette[1],
           light: palette[2],
           motif: motif,
-          seed: seed,
+          seed: hash,
         ),
       ),
     );

@@ -10,8 +10,8 @@ import '../../core/widgets/common.dart';
 import '../../data/repositories.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({super.key, required this.slug});
-  final String slug;
+  const ReaderScreen({super.key, required this.id});
+  final String id;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -57,7 +57,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       data: KitabuTheme.dark(),
       child: Builder(builder: (ctx) {
         final k = ctx.kit;
-        final bookAsync = ref.watch(bookBySlugProvider(widget.slug));
+        final bookAsync = ref.watch(bookByIdProvider(widget.id));
 
         return bookAsync.when(
           loading: () => Scaffold(
