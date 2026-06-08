@@ -1,16 +1,23 @@
 import 'dart:math' show pi;
+
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
-import '../data/local_data.dart';
+
 import '../data/providers.dart';
-import '../models/content.dart';
-import '../models/episode.dart';
+import '../models/media.dart';
 import '../theme/app_theme.dart';
+import '../widgets/action_btn.dart';
+import '../widgets/detail_skeleton.dart';
+import '../widgets/info_chip.dart';
+import '../widgets/player_loading_view.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/sinemax_icon.dart';
+
+const _kFallbackUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
 class DetailScreen extends ConsumerStatefulWidget {
   final String contentId;
@@ -25,34 +32,65 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   ChewieController? _cc;
   bool _playerReady = false;
   bool _episodesExpanded = false;
+  int _activeFileIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _initPlayer();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAndInitPlayer());
   }
 
-  Future<void> _initPlayer() async {
-    _vpc = VideoPlayerController.networkUrl(Uri.parse(sampleVideoUrl));
+  Future<void> _loadAndInitPlayer() async {
+    if (!mounted) return;
+    try {
+      final files = await ref.read(mediaFilesProvider(widget.contentId).future);
+      final url = (files.isNotEmpty && files.first.downloadUrl != null) ? files.first.downloadUrl! : _kFallbackUrl;
+      await _initPlayer(url);
+      // TODO: [DO NOT TOUCH] After player initializes, increment view_count on Supabase for widget.contentId.
+      // Use: supabase.rpc('increment_view_count', params: {'media_id': widget.contentId}) or a direct UPDATE.
+      // Only fire once per session open, not on file switches.
+      // TODO: [DO NOT TOUCH] After player initializes, restore saved playback position for the first file
+      // from Hive (box: 'watch_progress', key: '${widget.contentId}_0'). Seek _vpc to saved Duration.
+    } catch (_) {
+      await _initPlayer(_kFallbackUrl);
+    }
+  }
+
+  Future<void> _switchToFile(MediaFile file, int index) async {
+    if (!mounted) return;
+    // TODO: [DO NOT TOUCH] Before disposing _vpc, save current playback position to Hive.
+    // Key: '${widget.contentId}_$_activeFileIndex', value: _vpc?.value.position (Duration → microseconds).
+    setState(() {
+      _playerReady = false;
+      _activeFileIndex = index;
+    });
+    _cc?.dispose();
+    _vpc?.dispose();
+    _cc = null;
+    _vpc = null;
+    final url = (file.downloadUrl != null && file.downloadUrl!.isNotEmpty) ? file.downloadUrl! : _kFallbackUrl;
+    await _initPlayer(url);
+    // TODO: [DO NOT TOUCH] After new file's player initializes, restore saved position for 'index'
+    // from Hive key '${widget.contentId}_$index'. Seek _vpc to saved Duration.
+  }
+
+  Future<void> _initPlayer(String url) async {
+    _vpc = VideoPlayerController.networkUrl(Uri.parse(url));
     await _vpc!.initialize();
     _cc = ChewieController(
       videoPlayerController: _vpc!,
-      autoPlay: false,
+      autoPlay: true,
       looping: false,
       aspectRatio: 16 / 9,
-      placeholder: _PosterPlaceholder(contentId: widget.contentId),
-      materialProgressColors: ChewieProgressColors(
-        playedColor: SinemaxColors.blue,
-        handleColor: SinemaxColors.blue,
-        backgroundColor: SinemaxColors.line2,
-        bufferedColor: SinemaxColors.line2,
-      ),
+      materialProgressColors: ChewieProgressColors(playedColor: SinemaxColors.blue, handleColor: SinemaxColors.blue, backgroundColor: SinemaxColors.line2, bufferedColor: SinemaxColors.line2),
     );
     if (mounted) setState(() => _playerReady = true);
   }
 
   @override
   void dispose() {
+    // TODO: [DO NOT TOUCH] Save current playback position before leaving the screen.
+    // Key: '${widget.contentId}_$_activeFileIndex', value: _vpc?.value.position (Duration → microseconds).
     _cc?.dispose();
     _vpc?.dispose();
     super.dispose();
@@ -60,41 +98,58 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final content = contentById(widget.contentId);
-    if (content == null) {
-      return Scaffold(
-        backgroundColor: SinemaxColors.bg,
-        body: Center(child: Text('Not found', style: SinemaxTextStyles.body(16, color: SinemaxColors.muted))),
-      );
-    }
+    final mediaAsync = ref.watch(mediaByIdProvider(widget.contentId));
 
-    final saved = ref.watch(savedProvider).contains(content.id);
+    return mediaAsync.when(
+      loading: () => const DetailSkeleton(),
+      error: (e, _) => Scaffold(
+        backgroundColor: SinemaxColors.bg,
+        body: Center(
+          child: Text('Error loading content', style: SinemaxTextStyles.body(15, color: SinemaxColors.muted)),
+        ),
+      ),
+      data: (media) {
+        if (media == null) {
+          return Scaffold(
+            backgroundColor: SinemaxColors.bg,
+            body: Center(
+              child: Text('Not found', style: SinemaxTextStyles.body(16, color: SinemaxColors.muted)),
+            ),
+          );
+        }
+        return _buildDetail(context, media);
+      },
+    );
+  }
+
+  Widget _buildDetail(BuildContext context, Media media) {
+    final filesAsync = ref.watch(mediaFilesProvider(widget.contentId));
+    final saved = ref.watch(savedProvider).contains(media.id);
     final topPad = MediaQuery.of(context).padding.top;
-    final hasEpisodes = content.isSeries && content.episodesList.isNotEmpty;
+
+    final files = filesAsync.value ?? [];
+    final hasFiles = media.isSeries && files.isNotEmpty;
+    final isFilesLoading = media.isSeries && filesAsync.isLoading;
 
     return Scaffold(
       backgroundColor: SinemaxColors.bg,
       body: Column(
         children: [
-          // ── FIXED zone: Player ─────────────────────────────────────────────
+          // ── FIXED zone: Player ───────────────────────────────────────────
           Stack(
             children: [
               AspectRatio(
                 aspectRatio: 16 / 9,
-                child: _playerReady && _cc != null
-                    ? Chewie(controller: _cc!)
-                    : _PosterPlaceholder(contentId: content.id),
+                child: _playerReady && _cc != null ? Chewie(controller: _cc!) : PlayerLoadingView(posterUrl: media.posterUrl),
               ),
               Positioned(
-                top: topPad + 8, left: 12,
+                top: topPad + 8,
+                left: 12,
                 child: GestureDetector(
                   onTap: () => context.pop(),
                   child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
                     child: const SinemaxIcon('arrowL', size: 20),
                   ),
                 ),
@@ -102,123 +157,151 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
             ],
           ),
 
-          // ── FIXED zone: Action buttons ─────────────────────────────────────
+          // ── Now-playing label ────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Builder(
+              builder: (_) {
+                final files = ref.watch(mediaFilesProvider(widget.contentId)).value ?? [];
+                final String label;
+                if (media.isSeries && files.isNotEmpty) {
+                  final active = files[_activeFileIndex.clamp(0, files.length - 1)];
+                  label = '${media.title}  ·  ${active.label ?? 'Episode ${_activeFileIndex + 1}'}';
+                } else {
+                  label = media.title;
+                }
+                return Text(
+                  label,
+                  style: SinemaxTextStyles.body(13, weight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
+            ),
+          ),
+
+          // ── FIXED zone: Action buttons ───────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Row(
               children: [
-                Expanded(child: _ActionBtn(icon: 'download', label: 'Download')),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: _ActionBtn(
-                    icon: saved ? 'bookmark-filled' : 'bookmark',
-                    label: 'Save',
-                    active: saved,
-                    onTap: () => ref.read(savedProvider.notifier).toggle(content.id),
-                  ),
+                  child: ActionBtn(icon: 'download', label: 'Download', onTap: () => ref.read(downloadsProvider.notifier).add(media.id)),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: _ActionBtn(icon: 'send', label: 'Share')),
+                Expanded(
+                  child: ActionBtn(icon: saved ? 'bookmark-filled' : 'bookmark', label: 'Save', active: saved, onTap: () => ref.read(savedProvider.notifier).toggle(media.id)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ActionBtn(icon: 'send', label: 'Share'),
+                ),
               ],
             ),
           ),
 
-          // ── SCROLLABLE zone ────────────────────────────────────────────────
+          // ── SCROLLABLE zone ──────────────────────────────────────────────
           Expanded(
             child: MediaQuery.removePadding(
               context: context,
               removeTop: true,
               child: CustomScrollView(
-              slivers: [
-                // Info: title, meta, description
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(content.title, style: SinemaxTextStyles.display(28, weight: FontWeight.w900)),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8, runSpacing: 6,
-                          children: [
-                            _Chip(label: content.djId),
-                            _Chip(label: '${content.year}'),
-                            _Chip(label: '${content.countryFlag} ${content.countryLabel}'),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(content.description, style: SinemaxTextStyles.body(14, color: SinemaxColors.muted)),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Episodes header — SliverAppBar pins it below the fixed zone
-                if (hasEpisodes)
-                  SliverAppBar(
-                    pinned: true,
-                    automaticallyImplyLeading: false,
-                    toolbarHeight: 46,
-                    backgroundColor: SinemaxColors.bg,
-                    elevation: 0,
-                    scrolledUnderElevation: 0,
-                    surfaceTintColor: Colors.transparent,
-                    titleSpacing: 0,
-                    actions: const [],
-                    title: _EpisodesHeader(
-                      count: '${content.totalEpisodes ?? content.episodesList.length} episodes',
-                      expanded: _episodesExpanded,
-                      onToggle: () => setState(() => _episodesExpanded = !_episodesExpanded),
-                    ),
-                  ),
-
-                // Collapsed: horizontal card scroll + Related
-                if (hasEpisodes && !_episodesExpanded) ...[
+                slivers: [
+                  // Info
                   SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 148,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: content.episodesList.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 10),
-                        itemBuilder: (context, i) =>
-                            _EpisodeCard(ep: content.episodesList[i], content: content),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(media.title, style: SinemaxTextStyles.display(28, weight: FontWeight.w900)),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              if (media.djDisplay.isNotEmpty) InfoChip(label: media.djDisplay),
+                              if (media.year != null) InfoChip(label: '${media.year}'),
+                              if (media.countryDisplay.isNotEmpty) InfoChip(label: media.countryDisplay),
+                              if (media.genreDisplay.isNotEmpty) InfoChip(label: media.genreDisplay),
+                            ],
+                          ),
+                          if (media.description != null && media.description!.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Text(media.description!, style: SinemaxTextStyles.body(14, color: SinemaxColors.muted)),
+                          ],
+                          const SizedBox(height: 20),
+                        ],
                       ),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                  SliverToBoxAdapter(child: _RelatedRow(content: content)),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                ],
 
-                // Expanded: vertical episode list, Related hidden
-                if (hasEpisodes && _episodesExpanded) ...[
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _EpisodeRow(ep: content.episodesList[i], content: content),
-                      childCount: content.episodesList.length,
+                  // While files are fetching for a series, show skeleton episodes
+                  if (isFilesLoading)
+                    const SliverToBoxAdapter(child: EpisodesSkeleton()),
+
+                  // Episodes header (pinned)
+                  if (hasFiles)
+                    SliverAppBar(
+                      pinned: true,
+                      automaticallyImplyLeading: false,
+                      toolbarHeight: 46,
+                      backgroundColor: SinemaxColors.bg,
+                      elevation: 0,
+                      scrolledUnderElevation: 0,
+                      surfaceTintColor: Colors.transparent,
+                      titleSpacing: 0,
+                      actions: const [],
+                      title: _EpisodesHeader(
+                        count: '${files.length} episode${files.length == 1 ? '' : 's'}',
+                        expanded: _episodesExpanded,
+                        onToggle: () => setState(() => _episodesExpanded = !_episodesExpanded),
+                      ),
                     ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                ],
 
-                // No episodes (movie): always show Related
-                if (!hasEpisodes) ...[
-                  SliverToBoxAdapter(child: _RelatedRow(content: content)),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  // Collapsed: horizontal scroll + Related
+                  if (hasFiles && !_episodesExpanded) ...[
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 96,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: files.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (context, i) => _FileCard(file: files[i], index: i, posterUrl: media.posterUrl, isActive: i == _activeFileIndex, onTap: () => _switchToFile(files[i], i)),
+                        ),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                    SliverToBoxAdapter(child: _RelatedGrid(mediaId: widget.contentId)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ],
+
+                  // Expanded: vertical list, Related hidden
+                  if (hasFiles && _episodesExpanded) ...[
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => _FileRow(file: files[i], index: i, posterUrl: media.posterUrl, isActive: i == _activeFileIndex, onTap: () => _switchToFile(files[i], i)),
+                        childCount: files.length,
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ],
+
+                  // Movie always; series only once files confirmed empty
+                  if (!hasFiles && !isFilesLoading) ...[SliverToBoxAdapter(child: _RelatedGrid(mediaId: widget.contentId)), const SliverToBoxAdapter(child: SizedBox(height: 32))],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
         ],
       ),
     );
   }
 }
+
+// ── Episodes header ───────────────────────────────────────────────────────────
 
 class _EpisodesHeader extends StatelessWidget {
   final String count;
@@ -249,10 +332,7 @@ class _EpisodesHeader extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    expanded ? 'Collapse' : 'Expand',
-                    style: SinemaxTextStyles.body(12, color: SinemaxColors.muted),
-                  ),
+                  Text(expanded ? 'Collapse' : 'Expand', style: SinemaxTextStyles.body(12, color: SinemaxColors.muted)),
                   const SizedBox(width: 4),
                   Transform.rotate(
                     angle: expanded ? pi : 0,
@@ -268,305 +348,250 @@ class _EpisodesHeader extends StatelessWidget {
   }
 }
 
-// ── Widgets ───────────────────────────────────────────────────────────────────
+// ── Horizontal file card (collapsed) ─────────────────────────────────────────
 
-class _ActionBtn extends StatelessWidget {
-  final String icon;
-  final String label;
-  final bool active;
+class _FileCard extends StatelessWidget {
+  final MediaFile file;
+  final int index;
+  final String? posterUrl;
+  final bool isActive;
   final VoidCallback? onTap;
-
-  const _ActionBtn({required this.icon, required this.label, this.active = false, this.onTap});
+  const _FileCard({required this.file, required this.index, this.posterUrl, this.isActive = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? SinemaxColors.blue : SinemaxColors.muted;
+    final label = file.label ?? 'Episode ${index + 1}';
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        width: 118,
+        height: 96,
         decoration: BoxDecoration(
-          color: SinemaxColors.panel,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? SinemaxColors.blue.withAlpha(90) : SinemaxColors.line,
-            width: 0.5,
-          ),
+          border: Border.all(color: isActive ? SinemaxColors.blue : Colors.transparent, width: 1.5),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SinemaxIcon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(label, style: SinemaxTextStyles.body(12, weight: FontWeight.w500, color: color)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Horizontal card (collapsed view)
-class _EpisodeCard extends StatelessWidget {
-  final Episode ep;
-  final Content content;
-  const _EpisodeCard({required this.ep, required this.content});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = content.poster;
-    return SizedBox(
-      width: 118,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 118, height: 88,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [p.from, p.to],
-                      ),
-                    ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(isActive ? 6.5 : 8),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // poster background
+              if (posterUrl != null && posterUrl!.isNotEmpty)
+                Opacity(
+                  opacity: isActive ? 0.55 : 0.35,
+                  child: CachedNetworkImage(
+                    imageUrl: posterUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const ColoredBox(color: SinemaxColors.panel2),
                   ),
-                  Positioned(
-                    top: 6, left: 8,
-                    child: Text(
-                      'EP ${ep.ep}',
-                      style: SinemaxTextStyles.display(11, weight: FontWeight.w700, color: p.accent),
-                    ),
-                  ),
-                  Center(
-                    child: Container(
+                )
+              else
+                const ColoredBox(color: SinemaxColors.panel2),
+              // gradient overlay
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black87], stops: [0.35, 1.0]),
+                ),
+              ),
+              // play icon + label
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
                       padding: const EdgeInsets.all(9),
-                      decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: isActive ? SinemaxColors.blue.withValues(alpha: 0.9) : Colors.black45, shape: BoxShape.circle),
                       child: const SinemaxIcon('play', size: 16),
                     ),
-                  ),
-                  if (ep.progress > 0 && ep.progress < 1)
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-                        child: LinearProgressIndicator(
-                          value: ep.progress,
-                          backgroundColor: SinemaxColors.line2,
-                          color: p.accent,
-                          minHeight: 3,
-                        ),
-                      ),
-                    ),
-                  if (ep.progress >= 1.0)
-                    Positioned(
-                      bottom: 6, right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: SinemaxColors.teal.withAlpha(40),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const SinemaxIcon('check', size: 10, color: SinemaxColors.teal),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(ep.title, style: SinemaxTextStyles.body(11, weight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          Text(ep.duration, style: SinemaxTextStyles.body(10, color: SinemaxColors.muted2)),
-        ],
-      ),
-    );
-  }
-}
-
-// Vertical row (expanded view)
-class _EpisodeRow extends StatelessWidget {
-  final Episode ep;
-  final Content content;
-  const _EpisodeRow({required this.ep, required this.content});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = content.poster;
-
-    final String statusText;
-    if (ep.progress >= 1.0) {
-      statusText = '${ep.duration} · Completed';
-    } else if (ep.progress > 0) {
-      statusText = '${ep.duration} · ${(ep.progress * 100).round()}% watched';
-    } else {
-      statusText = ep.duration;
-    }
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: SinemaxColors.panel,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: SinemaxColors.line, width: 0.5),
-      ),
-      child: Row(
-        children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              width: 68, height: 52,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [p.from, p.to],
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                      child: const SinemaxIcon('play', size: 14),
-                    ),
-                  ),
-                  if (ep.progress > 0 && ep.progress < 1)
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: LinearProgressIndicator(
-                        value: ep.progress,
-                        backgroundColor: SinemaxColors.line2,
-                        color: p.accent,
-                        minHeight: 3,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Episode info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      ep.ep.toString().padLeft(2, '0'),
-                      style: SinemaxTextStyles.display(13, weight: FontWeight.w700, color: p.accent),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text(
-                        ep.title,
-                        style: SinemaxTextStyles.body(13, weight: FontWeight.w500),
-                        maxLines: 1,
+                        label,
+                        style: SinemaxTextStyles.body(10, weight: FontWeight.w600),
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(statusText, style: SinemaxTextStyles.body(11, color: SinemaxColors.muted2)),
-              ],
-            ),
+              ),
+              // "NOW" badge when active
+              if (isActive)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(4)),
+                    child: Text('NOW', style: SinemaxTextStyles.body(8, weight: FontWeight.w700)),
+                  ),
+                ),
+              // TODO: [DO NOT TOUCH] Show a thin progress bar at the very top of this card.
+              // Read saved position from Hive key '${mediaId}_$index' and total duration from Hive.
+              // Render as a Positioned(top:0) FractionallySizedBox with height 3, color SinemaxColors.blue.
+            ],
           ),
-          const SizedBox(width: 8),
-          if (ep.progress >= 1.0)
-            const SinemaxIcon('check', size: 16, color: SinemaxColors.teal)
-          else
-            const SinemaxIcon('download', size: 16, color: SinemaxColors.muted2),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _PosterPlaceholder extends StatelessWidget {
-  final String contentId;
-  const _PosterPlaceholder({required this.contentId});
+// ── Vertical file row (expanded) ──────────────────────────────────────────────
+
+class _FileRow extends StatelessWidget {
+  final MediaFile file;
+  final int index;
+  final String? posterUrl;
+  final bool isActive;
+  final VoidCallback? onTap;
+  const _FileRow({required this.file, required this.index, this.posterUrl, this.isActive = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final c = contentById(contentId);
-    final p = c?.poster;
-    return Container(
-      color: p != null ? p.to : SinemaxColors.bg2,
-      child: Center(
-        child: p != null
-            ? Text(p.glyph, style: TextStyle(fontSize: 64, color: p.accent.withAlpha(120)))
-            : const SinemaxIcon('play', size: 48, color: SinemaxColors.muted2),
+    final label = file.label ?? 'Episode ${index + 1}';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        height: 72,
+        decoration: BoxDecoration(
+          color: isActive ? SinemaxColors.blue.withValues(alpha: 0.07) : SinemaxColors.panel,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isActive ? SinemaxColors.blue.withValues(alpha: 0.7) : SinemaxColors.line, width: isActive ? 1.0 : 0.5),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // poster bleeds in from the right
+              if (posterUrl != null && posterUrl!.isNotEmpty)
+                Opacity(
+                  opacity: isActive ? 0.35 : 0.20,
+                  child: CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover, alignment: Alignment.centerRight, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                ),
+              // steeper gradient: solid left → transparent by 72% so poster shows on right
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [isActive ? SinemaxColors.blue.withValues(alpha: 0.12) : SinemaxColors.panel, SinemaxColors.panel.withValues(alpha: 0.6), Colors.transparent],
+                    stops: const [0.0, 0.42, 0.72],
+                  ),
+                ),
+              ),
+              // left accent bar when active
+              if (isActive)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 3,
+                    decoration: const BoxDecoration(
+                      color: SinemaxColors.blue,
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(10), bottomLeft: Radius.circular(10)),
+                    ),
+                  ),
+                ),
+              // TODO: [DO NOT TOUCH] Show watch progress as a filled overlay across the full row height.
+              // Read saved position from Hive key '${mediaId}_$index' and total duration from Hive.
+              // Render as Positioned.fill with an AlignmentDirectional FractionallySizedBox (widthFactor =
+              // (savedPosition / totalDuration).clamp(0,1)) aligned to the left, low-opacity SinemaxColors.blue
+              // (alpha ~0.12) so the existing content (text, icons) remains readable on top.
+              // content row
+              Padding(
+                padding: EdgeInsets.only(left: isActive ? 17 : 14, right: 14),
+                child: Row(
+                  children: [
+                    // label + season
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            label,
+                            style: SinemaxTextStyles.body(13, weight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (file.season != null) Text('Season ${file.season}', style: SinemaxTextStyles.body(11, color: SinemaxColors.muted2)),
+                        ],
+                      ),
+                    ),
+                    // download icon
+                    const SinemaxIcon('download', size: 15, color: SinemaxColors.muted2),
+                    const SizedBox(width: 12),
+                    // play circle — filled when active
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isActive ? SinemaxColors.blue : SinemaxColors.blue.withValues(alpha: 0.15),
+                        border: Border.all(color: SinemaxColors.blue.withValues(alpha: isActive ? 1.0 : 0.6), width: 1.0),
+                      ),
+                      child: Center(child: SinemaxIcon('play', size: 13, color: isActive ? SinemaxColors.ink : SinemaxColors.blue)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  final String label;
-  const _Chip({required this.label});
+// ── Related row ───────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: SinemaxColors.panel2,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: SinemaxColors.line, width: 0.5),
-      ),
-      child: Text(label, style: SinemaxTextStyles.body(12, color: SinemaxColors.muted)),
-    );
-  }
-}
-
-class _RelatedRow extends ConsumerWidget {
-  final Content content;
-  const _RelatedRow({required this.content});
+class _RelatedGrid extends ConsumerWidget {
+  final String mediaId;
+  const _RelatedGrid({required this.mediaId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final related = contentWhere(
-      (c) => c.id != content.id &&
-          (c.countryLabel == content.countryLabel ||
-              c.genre.split(' · ').first == content.genre.split(' · ').first),
-    ).take(6).toList();
-
-    if (related.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Text('RELATED', style: SinemaxTextStyles.display(18, weight: FontWeight.w700)),
-        ),
-        SizedBox(
-          height: 202,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: related.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => PosterCard(
-              content: related[i],
-              onTap: () => context.pushReplacement('/detail/${related[i].id}'),
+    final relatedAsync = ref.watch(relatedMediaProvider(mediaId));
+    return relatedAsync.when(
+      loading: () => const RelatedSkeleton(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (related) {
+        if (related.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: Text('RELATED', style: SinemaxTextStyles.display(18, weight: FontWeight.w700)),
             ),
-          ),
-        ),
-      ],
+            GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.62,
+              ),
+              itemCount: related.length,
+              itemBuilder: (context, i) => LayoutBuilder(
+                builder: (context, constraints) => PosterCard(
+                  media: related[i],
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  onTap: () => context.pushReplacement('/detail/${related[i].id}'),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -15,14 +15,8 @@ import 'widgets/bottom_nav_bar.dart';
 final _router = GoRouter(
   initialLocation: '/splash',
   routes: [
-    GoRoute(
-      path: '/splash',
-      builder: (_, _) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/search',
-      builder: (_, _) => const SearchScreen(),
-    ),
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+    GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
     GoRoute(
       path: '/detail/:id',
       builder: (_, state) => DetailScreen(contentId: state.pathParameters['id']!),
@@ -30,21 +24,21 @@ final _router = GoRouter(
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => _AppShell(shell: shell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/home',     builder: (_, _) => const HomeScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/discover', builder: (_, _) => const DiscoverScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/requests', builder: (_, _) => const RequestsScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/library',  builder: (_, _) => const LibraryScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/profile',  builder: (_, _) => const ProfileScreen()),
-        ]),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/home', builder: (_, _) => const HomeScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/discover', builder: (_, _) => const DiscoverScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/requests', builder: (_, _) => const RequestsScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/library', builder: (_, _) => const LibraryScreen())],
+        ),
+        StatefulShellBranch(
+          routes: [GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen())],
+        ),
       ],
     ),
   ],
@@ -55,12 +49,7 @@ class SinemaxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'SINEMAX',
-      debugShowCheckedModeBanner: false,
-      theme: buildSinemaxTheme(),
-      routerConfig: _router,
-    );
+    return MaterialApp.router(title: 'SINEMAX', debugShowCheckedModeBanner: false, theme: buildSinemaxTheme(), routerConfig: _router);
   }
 }
 

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../data/providers.dart';
+import '../models/media.dart';
 import '../theme/app_theme.dart';
-import '../widgets/sinemax_icon.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/sinemax_icon.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -15,13 +17,11 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
-  final _focusNode  = FocusNode();
-  late final SearchNotifier _searchNotifier;
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _searchNotifier = ref.read(searchQueryProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
   }
 
@@ -29,23 +29,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
-    Future(() => _searchNotifier.clear());
+    ref.read(searchQueryProvider.notifier).clear();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final results = ref.watch(searchResultsProvider);
-    final query   = ref.watch(searchQueryProvider);
+    final resultsAsync = ref.watch(searchResultsProvider);
+    final query = ref.watch(searchQueryProvider);
 
     return Scaffold(
       backgroundColor: SinemaxColors.bg,
       appBar: AppBar(
         backgroundColor: SinemaxColors.bg,
-        leading: IconButton(
-          icon: const SinemaxIcon('arrowL', size: 22),
-          onPressed: () => context.pop(),
-        ),
+        leading: IconButton(icon: const SinemaxIcon('arrowL', size: 22), onPressed: () => context.pop()),
         titleSpacing: 0,
         title: TextField(
           controller: _controller,
@@ -75,9 +72,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: query.isEmpty
           ? _EmptyState()
-          : results.isEmpty
-              ? _NoResults(query: query)
-              : _Results(results: results),
+          : resultsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text('Search failed', style: SinemaxTextStyles.body(15, color: SinemaxColors.muted)),
+              ),
+              data: (results) => results.isEmpty ? _NoResults(query: query) : _Results(results: results),
+            ),
     );
   }
 }
@@ -89,11 +90,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SinemaxIcon('search', size: 48, color: SinemaxColors.muted2),
+          const SinemaxIcon('search', size: 48, color: SinemaxColors.muted2),
           const SizedBox(height: 16),
           Text('Search for movies & series', style: SinemaxTextStyles.body(16, color: SinemaxColors.muted)),
           const SizedBox(height: 6),
-          Text('Type a title, genre or country', style: SinemaxTextStyles.body(13, color: SinemaxColors.muted2)),
+          Text('Type a title, genre, DJ or country', style: SinemaxTextStyles.body(13, color: SinemaxColors.muted2)),
         ],
       ),
     );
@@ -110,7 +111,7 @@ class _NoResults extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SinemaxIcon('x', size: 40, color: SinemaxColors.muted2),
+          const SinemaxIcon('x', size: 40, color: SinemaxColors.muted2),
           const SizedBox(height: 16),
           Text('No results for "$query"', style: SinemaxTextStyles.body(15, color: SinemaxColors.muted)),
           const SizedBox(height: 6),
@@ -122,27 +123,17 @@ class _NoResults extends StatelessWidget {
 }
 
 class _Results extends StatelessWidget {
-  final List results;
+  final List<Media> results;
   const _Results({required this.results});
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
       padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 130 / 190,
-      ),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 130 / 190),
       itemCount: results.length,
       itemBuilder: (context, i) => LayoutBuilder(
-        builder: (context, constraints) => PosterCard(
-          content: results[i],
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          onTap: () => context.push('/detail/${results[i].id}'),
-        ),
+        builder: (context, constraints) => PosterCard(media: results[i], width: constraints.maxWidth, height: constraints.maxHeight, onTap: () => context.push('/detail/${results[i].id}')),
       ),
     );
   }

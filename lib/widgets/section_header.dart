@@ -6,12 +6,7 @@ class SectionHeader extends StatelessWidget {
   final String subtitle;
   final VoidCallback? onSeeAll;
 
-  const SectionHeader({
-    super.key,
-    required this.title,
-    this.subtitle = '',
-    this.onSeeAll,
-  });
+  const SectionHeader({super.key, required this.title, this.subtitle = '', this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +20,7 @@ class SectionHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: SinemaxTextStyles.display(18, weight: FontWeight.w700)),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: SinemaxTextStyles.body(12, color: SinemaxColors.muted)),
-                ],
+                if (subtitle.isNotEmpty) ...[const SizedBox(height: 2), Text(subtitle, style: SinemaxTextStyles.body(12, color: SinemaxColors.muted))],
               ],
             ),
           ),
@@ -37,10 +29,7 @@ class SectionHeader extends StatelessWidget {
               onTap: onSeeAll,
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Text(
-                  'See All >',
-                  style: SinemaxTextStyles.body(12, color: SinemaxColors.blue),
-                ),
+                child: Text('See All >', style: SinemaxTextStyles.body(12, color: SinemaxColors.blue)),
               ),
             ),
         ],

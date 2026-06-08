@@ -20,10 +20,7 @@ class SinemaxSearchBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: SinemaxColors.line, width: 0.5),
               ),
-              child: Text(
-                'Search movies, series...',
-                style: SinemaxTextStyles.body(13, color: SinemaxColors.muted2),
-              ),
+              child: Text('Search movies, series...', style: SinemaxTextStyles.body(13, color: SinemaxColors.muted2)),
             ),
           ),
         ),
@@ -32,10 +29,7 @@ class SinemaxSearchBar extends StatelessWidget {
           onTap: () => context.push('/search'),
           child: Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: SinemaxColors.blue,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(8)),
             child: const SinemaxIcon('search', size: 20, color: Colors.white),
           ),
         ),

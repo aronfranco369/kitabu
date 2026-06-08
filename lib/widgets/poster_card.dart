@@ -1,25 +1,23 @@
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../models/content.dart';
-import '../data/local_data.dart';
+
+import '../models/media.dart';
 import '../theme/app_theme.dart';
 
-// Dimensions of the DJ notch cut into the top-right corner of the card.
 const double _notchW = 64.0;
 const double _notchH = 22.0;
 const double _cardRadius = 10.0;
 
 class PosterCard extends StatelessWidget {
-  final Content content;
+  final Media media;
   final VoidCallback? onTap;
   final double width;
   final double height;
 
-  const PosterCard({super.key, required this.content, this.onTap, this.width = 120, this.height = 200});
+  const PosterCard({super.key, required this.media, this.onTap, this.width = 120, this.height = 200});
 
   @override
   Widget build(BuildContext context) {
-    final p = content.poster;
-    final dj = djById(content.djId);
     final cardHeight = height - 50;
 
     return GestureDetector(
@@ -30,56 +28,45 @@ class PosterCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Card image area — clipped with a notch on the top-right
+            // Card image area — clipped with a notch on the top-right for DJ badge
             SizedBox(
               width: width,
               height: cardHeight,
               child: Stack(
                 children: [
-                  // Card body (gradient bg + glyph + type badge), clipped to notch shape
+                  // Poster image (clipped to notch shape)
                   ClipPath(
                     clipper: const _NotchClipper(),
                     child: SizedBox.expand(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Gradient background
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.from, p.to]),
-                            ),
-                          ),
-
-                          // Centered glyph watermark
-                          Center(
-                            child: Text(p.glyph, style: TextStyle(fontSize: 58, color: p.accent.withAlpha(55), height: 1)),
-                          ),
-                        ],
-                      ),
+                      child: media.posterUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: media.posterUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(color: SinemaxColors.panel2),
+                              errorWidget: (_, __, ___) => _PosterFallback(isSeries: media.isSeries),
+                            )
+                          : _PosterFallback(isSeries: media.isSeries),
                     ),
                   ),
 
-                  // DJ badge — sits in the notch cut-out at top-right
-                  if (dj != null)
+                  // DJ badge — notch slot at top-right
+                  if (media.djDisplay.isNotEmpty)
                     Positioned(
                       top: 0,
                       right: 0,
                       width: _notchW,
                       height: _notchH,
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: p.accent.withAlpha(55),
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(_cardRadius),
-                            bottomLeft: Radius.circular(6),
-                          ),
-                          border: Border.all(color: p.accent.withAlpha(140), width: 0.8),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.only(topRight: Radius.circular(_cardRadius), bottomLeft: Radius.circular(6)),
                         ),
                         alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
-                          dj.name,
-                          style: SinemaxTextStyles.body(8.5, weight: FontWeight.w600, color: p.accent),
+                          media.djDisplay,
+                          // style: SinemaxTextStyles.display(12, weight: FontWeight.w300),
+                          style: SinemaxTextStyles.body(7.5, weight: FontWeight.w900),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -93,7 +80,7 @@ class PosterCard extends StatelessWidget {
 
             // Title
             Text(
-              content.title,
+              media.title,
               style: SinemaxTextStyles.display(12, weight: FontWeight.w700),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -104,19 +91,18 @@ class PosterCard extends StatelessWidget {
             // Meta row
             Row(
               children: [
-                Text('${content.year}', style: SinemaxTextStyles.body(10, color: SinemaxColors.muted2)),
-                Text(' · ', style: SinemaxTextStyles.body(10, color: SinemaxColors.muted2)),
-                Flexible(
-                  child: Text(
-                    content.countryLabel,
-                    style: SinemaxTextStyles.body(10, color: SinemaxColors.muted2),
-                    overflow: TextOverflow.ellipsis,
+                if (media.year != null) ...[
+                  Text('${media.year}', style: SinemaxTextStyles.display(12, weight: FontWeight.w300)),
+                  if (media.countryDisplay.isNotEmpty) Text(' · ', style: SinemaxTextStyles.display(12, weight: FontWeight.w700)),
+                ],
+                if (media.countryDisplay.isNotEmpty)
+                  Flexible(
+                    child: Text(
+                      media.countryDisplay,
+                      style: SinemaxTextStyles.display(12, weight: FontWeight.w300),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.star_rounded, size: 10, color: SinemaxColors.gold),
-                const SizedBox(width: 2),
-                Text(content.rating.toStringAsFixed(1), style: SinemaxTextStyles.body(10, color: SinemaxColors.muted2)),
               ],
             ),
           ],
@@ -126,8 +112,21 @@ class PosterCard extends StatelessWidget {
   }
 }
 
+class _PosterFallback extends StatelessWidget {
+  final bool isSeries;
+  const _PosterFallback({required this.isSeries});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: SinemaxColors.panel2,
+      child: Center(child: Icon(isSeries ? Icons.tv_rounded : Icons.movie_rounded, size: 32, color: SinemaxColors.muted2)),
+    );
+  }
+}
+
 // Clips a rectangle with rounded corners everywhere except the top-right,
-// which is replaced by a rectangular notch (_notchW × _notchH) to host the DJ badge.
+// which is replaced by a rectangular notch (_notchW × _notchH) for the DJ badge.
 class _NotchClipper extends CustomClipper<Path> {
   const _NotchClipper();
 
@@ -138,20 +137,14 @@ class _NotchClipper extends CustomClipper<Path> {
     final h = size.height;
 
     return Path()
-      // Start just after top-left arc
       ..moveTo(r, 0)
-      // Top edge → notch start
       ..lineTo(w - _notchW, 0)
-      // Notch: step down, then right to the card edge
       ..lineTo(w - _notchW, _notchH)
       ..lineTo(w, _notchH)
-      // Right edge down to bottom-right arc start
       ..lineTo(w, h - r)
       ..quadraticBezierTo(w, h, w - r, h)
-      // Bottom edge to bottom-left arc start
       ..lineTo(r, h)
       ..quadraticBezierTo(0, h, 0, h - r)
-      // Left edge up to top-left arc start
       ..lineTo(0, r)
       ..quadraticBezierTo(0, 0, r, 0)
       ..close();

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../data/local_data.dart';
+
 import '../data/providers.dart';
+import '../models/library_item.dart';
+import '../models/media.dart';
 import '../theme/app_theme.dart';
 import '../widgets/movie_card.dart';
 import '../widgets/sinemax_icon.dart';
@@ -14,14 +16,14 @@ class LibraryScreen extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen>
-    with SingleTickerProviderStateMixin {
+class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabs;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
+    _tabs.animation!.addListener(() => setState(() {}));
   }
 
   @override
@@ -36,29 +38,53 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       backgroundColor: SinemaxColors.bg,
       appBar: AppBar(
         backgroundColor: SinemaxColors.bg,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: Text('Library', style: SinemaxTextStyles.display(22, weight: FontWeight.w700)),
-        bottom: TabBar(
-          controller: _tabs,
-          labelColor: SinemaxColors.blue,
-          unselectedLabelColor: SinemaxColors.muted2,
-          indicatorColor: SinemaxColors.blue,
-          indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: SinemaxTextStyles.body(13, weight: FontWeight.w600),
-          unselectedLabelStyle: SinemaxTextStyles.body(13),
-          tabs: const [
-            Tab(text: 'Recent'),
-            Tab(text: 'Saved'),
-            Tab(text: 'Downloads'),
-          ],
-        ),
+        bottom: _PillTabBar(controller: _tabs),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _RecentTab(),
-          _SavedTab(),
-          _DownloadsTab(),
-        ],
+      body: TabBarView(controller: _tabs, children: [_RecentTab(), _SavedTab(), _DownloadsTab()]),
+    );
+  }
+}
+
+class _PillTabBar extends StatelessWidget implements PreferredSizeWidget {
+  final TabController controller;
+  const _PillTabBar({required this.controller});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(52);
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = ['Recent', 'Saved', 'Downloads'];
+    final activeIndex = (controller.animation?.value ?? controller.index.toDouble()).round();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(color: SinemaxColors.panel, borderRadius: BorderRadius.circular(30)),
+        child: Row(
+          children: List.generate(labels.length, (i) {
+            final selected = activeIndex == i;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => controller.animateTo(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(color: selected ? SinemaxColors.blue : Colors.transparent, borderRadius: BorderRadius.circular(30)),
+                  child: Text(
+                    labels[i],
+                    textAlign: TextAlign.center,
+                    style: SinemaxTextStyles.body(13, weight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? Colors.white : SinemaxColors.muted),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -69,21 +95,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 class _RecentTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recent = ref.watch(recentProvider);
-    if (recent.isEmpty) return _Empty(icon: 'clock', message: 'Nothing watched yet');
+    final recentAsync = ref.watch(recentContentProvider);
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: recent.length,
-      itemBuilder: (context, i) {
-        final item = recent[i];
-        final content = contentById(item.contentId);
-        if (content == null) return const SizedBox.shrink();
-        return MovieCard(
-          content: content,
-          meta: '${item.watchedAt} · ${item.context}',
-          progress: item.progress < 1.0 ? item.progress : null,
-          onTap: () => context.push('/detail/${content.id}'),
+    return recentAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _Empty(icon: 'clock', message: 'Failed to load'),
+      data: (pairs) {
+        if (pairs.isEmpty) {
+          return _Empty(icon: 'clock', message: 'Nothing watched yet');
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: pairs.length,
+          itemBuilder: (context, i) {
+            final (item, media) = pairs[i];
+            return MovieCard(
+              media: media,
+              meta: '${_fmtDate(item.watchedAt)}${item.context.isNotEmpty ? ' · ${item.context}' : ''}',
+              progress: item.progress > 0 && item.progress < 1 ? item.progress : null,
+              onTap: () => context.push('/detail/${media.id}'),
+            );
+          },
         );
       },
     );
@@ -95,21 +127,29 @@ class _RecentTab extends ConsumerWidget {
 class _SavedTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final saved = ref.watch(savedContentProvider);
-    if (saved.isEmpty) return _Empty(icon: 'bookmark', message: 'No saved titles yet');
+    final savedAsync = ref.watch(savedContentProvider);
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: saved.length,
-      itemBuilder: (context, i) {
-        final content = saved[i];
-        return MovieCard(
-          content: content,
-          trailing: GestureDetector(
-            onTap: () => ref.read(savedProvider.notifier).toggle(content.id),
-            child: const SinemaxIcon('x', size: 18, color: SinemaxColors.muted2),
-          ),
-          onTap: () => context.push('/detail/${content.id}'),
+    return savedAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _Empty(icon: 'bookmark', message: 'Failed to load'),
+      data: (saved) {
+        if (saved.isEmpty) {
+          return _Empty(icon: 'bookmark', message: 'No saved titles yet');
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: saved.length,
+          itemBuilder: (context, i) {
+            final media = saved[i];
+            return MovieCard(
+              media: media,
+              trailing: GestureDetector(
+                onTap: () => ref.read(savedProvider.notifier).toggle(media.id),
+                child: const SinemaxIcon('x', size: 18, color: SinemaxColors.muted2),
+              ),
+              onTap: () => context.push('/detail/${media.id}'),
+            );
+          },
         );
       },
     );
@@ -121,75 +161,32 @@ class _SavedTab extends ConsumerWidget {
 class _DownloadsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dlItems = ref.watch(downloadsProvider);
-    if (dlItems.isEmpty) return _Empty(icon: 'download', message: 'No downloads yet');
+    final dlAsync = ref.watch(downloadsContentProvider);
 
-    final totalUsed = storagePercent;
-
-    return CustomScrollView(
-      slivers: [
-        // Storage bar
-        SliverToBoxAdapter(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: SinemaxColors.panel,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: SinemaxColors.line, width: 0.5),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const SinemaxIcon('download', size: 16, color: SinemaxColors.muted),
-                    const SizedBox(width: 8),
-                    Text('Storage', style: SinemaxTextStyles.body(13, weight: FontWeight.w600)),
-                    const Spacer(),
-                    Text(
-                      '$storageUsed / $storageTotal',
-                      style: SinemaxTextStyles.body(12, color: SinemaxColors.muted),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(
-                    value: totalUsed,
-                    backgroundColor: SinemaxColors.line2,
-                    color: SinemaxColors.blue,
-                    minHeight: 6,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) {
-              final dl = dlItems[i];
-              final content = contentById(dl.contentId);
-              if (content == null) return const SizedBox.shrink();
-              return MovieCard(
-                content: content,
-                meta: '${dl.quality} · ${dl.size} · ${dl.at}',
-                trailing: GestureDetector(
-                  onTap: () => ref.read(downloadsProvider.notifier).remove(dl.contentId),
-                  child: const SinemaxIcon('trash', size: 18, color: SinemaxColors.muted2),
-                ),
-                onTap: () => context.push('/detail/${content.id}'),
-              );
-            },
-            childCount: dlItems.length,
-          ),
-        ),
-
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
+    return dlAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _Empty(icon: 'download', message: 'Failed to load'),
+      data: (pairs) {
+        if (pairs.isEmpty) {
+          return _Empty(icon: 'download', message: 'No downloads yet');
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: pairs.length,
+          itemBuilder: (context, i) {
+            final (dl, media) = pairs[i];
+            return MovieCard(
+              media: media,
+              meta: '${dl.quality} · ${dl.size} · ${_fmtDate(dl.at)}',
+              trailing: GestureDetector(
+                onTap: () => ref.read(downloadsProvider.notifier).remove(dl.contentId),
+                child: const SinemaxIcon('trash', size: 18, color: SinemaxColors.muted2),
+              ),
+              onTap: () => context.push('/detail/${media.id}'),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -213,5 +210,17 @@ class _Empty extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+String _fmtDate(String isoStr) {
+  try {
+    final dt = DateTime.parse(isoStr);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[dt.month - 1]} ${dt.day}';
+  } catch (_) {
+    return isoStr;
   }
 }

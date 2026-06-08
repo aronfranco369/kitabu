@@ -14,8 +14,8 @@ class RequestsScreen extends ConsumerStatefulWidget {
 
 class _RequestsScreenState extends ConsumerState<RequestsScreen> {
   final _titleCtrl = TextEditingController();
-  final _noteCtrl  = TextEditingController();
-  bool _submitted  = false;
+  final _noteCtrl = TextEditingController();
+  bool _submitted = false;
 
   @override
   void dispose() {
@@ -56,32 +56,17 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Request a Movie or Series',
-                    style: SinemaxTextStyles.display(18, weight: FontWeight.w700),
-                  ),
+                  Text('Request a Movie or Series', style: SinemaxTextStyles.display(18, weight: FontWeight.w700)),
                   const SizedBox(height: 4),
-                  Text(
-                    "Can't find what you're looking for? Let us know and we'll add it as soon as we can.",
-                    style: SinemaxTextStyles.body(13, color: SinemaxColors.muted),
-                  ),
+                  Text("Can't find what you're looking for? Let us know and we'll add it as soon as we can.", style: SinemaxTextStyles.body(13, color: SinemaxColors.muted)),
                   const SizedBox(height: 16),
 
                   // Title input
-                  _InputField(
-                    controller: _titleCtrl,
-                    hint: 'Type a movie or series name...',
-                    icon: 'edit',
-                  ),
+                  _InputField(controller: _titleCtrl, hint: 'Type a movie or series name...', icon: 'edit'),
                   const SizedBox(height: 10),
 
                   // Notes input
-                  _InputField(
-                    controller: _noteCtrl,
-                    hint: 'Any extra details? (year, language, season, DJ...)',
-                    icon: 'list',
-                    maxLines: 3,
-                  ),
+                  _InputField(controller: _noteCtrl, hint: 'Any extra details? (year, language, season, DJ...)', icon: 'list', maxLines: 3),
                   const SizedBox(height: 14),
 
                   // Submit button
@@ -95,17 +80,16 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
                               onTap: _submit,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: SinemaxColors.blue,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(10)),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     const SinemaxIcon('send', size: 16, color: Colors.white),
                                     const SizedBox(width: 8),
-                                    Text('Send Request',
-                                        style: SinemaxTextStyles.body(15, weight: FontWeight.w600, color: Colors.white)),
+                                    Text(
+                                      'Send Request',
+                                      style: SinemaxTextStyles.body(15, weight: FontWeight.w600, color: Colors.white),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -130,10 +114,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen> {
 
           // History
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, i) => _RequestCard(request: history[i]),
-              childCount: history.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, i) => _RequestCard(request: history[i]), childCount: history.length),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -149,12 +130,7 @@ class _InputField extends StatelessWidget {
   final String icon;
   final int maxLines;
 
-  const _InputField({
-    required this.controller,
-    required this.hint,
-    required this.icon,
-    this.maxLines = 1,
-  });
+  const _InputField({required this.controller, required this.hint, required this.icon, this.maxLines = 1});
 
   @override
   Widget build(BuildContext context) {
@@ -182,10 +158,7 @@ class _InputField extends StatelessWidget {
                 hintText: hint,
                 hintStyle: SinemaxTextStyles.body(14, color: SinemaxColors.muted2),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: maxLines > 1 ? 12 : 14,
-                  horizontal: 0,
-                ),
+                contentPadding: EdgeInsets.symmetric(vertical: maxLines > 1 ? 12 : 14, horizontal: 0),
               ),
             ),
           ),
@@ -212,7 +185,10 @@ class _SuccessBanner extends StatelessWidget {
         children: [
           const SinemaxIcon('check', size: 18, color: SinemaxColors.teal),
           const SizedBox(width: 8),
-          Text('Request sent!', style: SinemaxTextStyles.body(15, weight: FontWeight.w600, color: SinemaxColors.teal)),
+          Text(
+            'Request sent!',
+            style: SinemaxTextStyles.body(15, weight: FontWeight.w600, color: SinemaxColors.teal),
+          ),
         ],
       ),
     );
@@ -241,10 +217,7 @@ class _RequestCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(request.title, style: SinemaxTextStyles.body(14, weight: FontWeight.w500)),
-                if (request.note.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(request.note, style: SinemaxTextStyles.body(12, color: SinemaxColors.muted2)),
-                ],
+                if (request.note.isNotEmpty) ...[const SizedBox(height: 4), Text(request.note, style: SinemaxTextStyles.body(12, color: SinemaxColors.muted2))],
                 const SizedBox(height: 6),
                 Text(request.date, style: SinemaxTextStyles.body(11, color: SinemaxColors.muted2)),
               ],
@@ -267,10 +240,7 @@ class _RequestCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                request.status.note,
-                style: SinemaxTextStyles.body(11, color: SinemaxColors.muted2),
-              ),
+              Text(request.status.note, style: SinemaxTextStyles.body(11, color: SinemaxColors.muted2)),
             ],
           ),
         ],

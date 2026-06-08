@@ -1,191 +1,254 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/content.dart';
+import 'package:hive_ce/hive.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../models/discover_filter.dart';
 import '../models/library_item.dart';
+import '../models/media.dart';
 import '../models/request.dart';
-import 'local_data.dart';
 
-// ── Catalog (read-only) ───────────────────────────────────────────────────────
+part 'providers.g.dart';
 
-final catalogProvider = Provider<List<Content>>((ref) => catalog);
+SupabaseClient get _db => Supabase.instance.client;
 
-final djsProvider = Provider((ref) => allDjs);
+// ── Catalog ───────────────────────────────────────────────────────────────────
 
-final homeRowsProvider = Provider((ref) => homeRows);
+@riverpod
+Future<List<Media>> catalog(Ref ref) async {
+  final data = await _db.from('media').select().order('title');
+  return (data as List).map((row) => Media.fromJson(row as Map<String, dynamic>)).toList();
+}
 
-final featuredProvider = Provider<Content?>((ref) => contentById(featuredId));
+@riverpod
+Future<Media?> mediaById(Ref ref, String id) async {
+  final list = await ref.watch(catalogProvider.future);
+  try {
+    return list.firstWhere((m) => m.id == id);
+  } catch (_) {
+    return null;
+  }
+}
+
+@riverpod
+Future<List<HomeRow>> homeRows(Ref ref) async {
+  final list = await ref.watch(catalogProvider.future);
+  final Map<String, List<Media>> groups = {};
+  for (final m in list) {
+    final country = m.countryDisplay;
+    if (country.isEmpty) continue;
+    final key = '${country.toUpperCase()} ${m.isSeries ? 'SERIES' : 'MOVIES'}';
+    groups.putIfAbsent(key, () => []).add(m);
+  }
+  return (groups.entries.where((e) => e.value.length >= 2).map((e) => HomeRow(id: e.key.toLowerCase().replaceAll(' ', '-'), title: e.key, items: e.value)).toList()
+    ..sort((a, b) => b.items.length.compareTo(a.items.length)));
+}
+
+@riverpod
+Future<List<MediaFile>> mediaFiles(Ref ref, String mediaId) async {
+  final data = await _db.from('files').select().eq('media_id', mediaId).order('season').order('created_at');
+  return (data as List).map((row) => MediaFile.fromJson(row as Map<String, dynamic>)).toList();
+}
+
+final trendingMediaProvider = FutureProvider<List<Media>>((ref) async {
+  final list = await ref.watch(catalogProvider.future);
+  final withViews = list.where((m) => m.viewCount > 0).toList()
+    ..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+  return withViews.take(5).toList();
+});
+
+@riverpod
+Future<List<Media>> relatedMedia(Ref ref, String mediaId) async {
+  final list = await ref.watch(catalogProvider.future);
+  try {
+    final media = list.firstWhere((m) => m.id == mediaId);
+    return list.where((m) => m.id != mediaId && (m.country == media.country || (m.genres.isNotEmpty && media.genres.isNotEmpty && m.genres.first == media.genres.first))).take(6).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+// ── Filter options ────────────────────────────────────────────────────────────
+
+@riverpod
+Future<List<String>> filterYears(Ref ref) async {
+  final list = await ref.watch(catalogProvider.future);
+  final years = list.map((m) => m.year?.toString() ?? '').where((y) => y.isNotEmpty).toSet().toList()..sort((a, b) => b.compareTo(a));
+  return ['All', ...years];
+}
+
+@riverpod
+Future<List<String>> filterDjs(Ref ref) async {
+  final list = await ref.watch(catalogProvider.future);
+  final djs = list.map((m) => m.dj ?? '').where((d) => d.isNotEmpty).toSet().toList()..sort();
+  return ['All', ...djs];
+}
+
+@riverpod
+Future<List<String>> filterCountries(Ref ref) async {
+  final list = await ref.watch(catalogProvider.future);
+  final countries = list.map((m) => m.countryDisplay).where((c) => c.isNotEmpty).toSet().toList()..sort();
+  return ['All', ...countries];
+}
 
 // ── Discover ──────────────────────────────────────────────────────────────────
 
-class DiscoverFilters {
-  final String year;
-  final String dj;
-  final String country;
-  final String type;
-
-  const DiscoverFilters({
-    this.year    = 'All',
-    this.dj      = 'All',
-    this.country = 'All',
-    this.type    = 'All',
-  });
-
-  DiscoverFilters copyWith({String? year, String? dj, String? country, String? type}) {
-    return DiscoverFilters(
-      year:    year    ?? this.year,
-      dj:      dj      ?? this.dj,
-      country: country ?? this.country,
-      type:    type    ?? this.type,
-    );
-  }
-
-  bool get isDefault => year == 'All' && dj == 'All' && country == 'All' && type == 'All';
-}
-
-class DiscoverNotifier extends Notifier<DiscoverFilters> {
+@riverpod
+class DiscoverFilters extends _$DiscoverFilters {
   @override
-  DiscoverFilters build() => const DiscoverFilters();
+  DiscoverFilter build() => const DiscoverFilter();
 
-  void setYear(String v)    => state = state.copyWith(year: v);
-  void setDj(String v)      => state = state.copyWith(dj: v);
+  void setYear(String v) => state = state.copyWith(year: v);
+  void setDj(String v) => state = state.copyWith(dj: v);
   void setCountry(String v) => state = state.copyWith(country: v);
-  void setType(String v)    => state = state.copyWith(type: v);
-  void reset()              => state = const DiscoverFilters();
+  void setType(String v) => state = state.copyWith(type: v);
+  void reset() => state = const DiscoverFilter();
 }
 
-final discoverFiltersProvider = NotifierProvider<DiscoverNotifier, DiscoverFilters>(
-  DiscoverNotifier.new,
-);
-
-final discoverResultsProvider = Provider<List<Content>>((ref) {
+@riverpod
+Future<List<Media>> discoverResults(Ref ref) async {
+  final list = await ref.watch(catalogProvider.future);
   final filters = ref.watch(discoverFiltersProvider);
-  if (filters.isDefault) {
-    return discoverGrid.map((id) => contentById(id)).whereType<Content>().toList();
-  }
-  return catalog.where((c) {
-    if (filters.year != 'All' && c.year.toString() != filters.year) return false;
-    if (filters.dj != 'All') {
-      final dj = djById(c.djId);
-      if (dj == null || dj.name != filters.dj) return false;
-    }
-    if (filters.country != 'All' && c.countryLabel != filters.country) return false;
+  if (filters.isDefault) return list;
+  return list.where((m) {
+    if (filters.year != 'All' && m.year?.toString() != filters.year) return false;
+    if (filters.dj != 'All' && m.dj != filters.dj) return false;
+    if (filters.country != 'All' && m.countryDisplay != filters.country) return false;
     if (filters.type != 'All') {
-      if (filters.type == 'Series' && c.type != 'series') return false;
-      if (filters.type == 'Movie'  && !(c.type == 'movie' && c.countryLabel != 'Tanzania')) return false;
-      if (filters.type == 'Bongo'  && !(c.type == 'movie' && c.countryLabel == 'Tanzania')) return false;
+      if (filters.type == 'Series' && !m.isSeries) return false;
+      if (filters.type == 'Movie' && m.isSeries) return false;
     }
     return true;
   }).toList();
-});
+}
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-class SearchNotifier extends Notifier<String> {
+@riverpod
+class SearchQuery extends _$SearchQuery {
   @override
   String build() => '';
   void set(String q) => state = q;
-  void clear()       => state = '';
+  void clear() => state = '';
 }
 
-final searchQueryProvider = NotifierProvider<SearchNotifier, String>(SearchNotifier.new);
-
-final searchResultsProvider = Provider<List<Content>>((ref) {
+@riverpod
+Future<List<Media>> searchResults(Ref ref) async {
   final q = ref.watch(searchQueryProvider).trim().toLowerCase();
   if (q.isEmpty) return [];
-  return catalog.where((c) {
-    return c.title.toLowerCase().contains(q) ||
-        c.genre.toLowerCase().contains(q) ||
-        c.countryLabel.toLowerCase().contains(q);
+  final list = await ref.watch(catalogProvider.future);
+  return list.where((m) {
+    return m.title.toLowerCase().contains(q) || m.genres.any((g) => g.toLowerCase().contains(q)) || m.countryDisplay.toLowerCase().contains(q) || (m.dj?.toLowerCase().contains(q) ?? false);
   }).toList();
-});
+}
 
 // ── Library — saved ───────────────────────────────────────────────────────────
 
-class SavedNotifier extends Notifier<List<String>> {
+@riverpod
+class Saved extends _$Saved {
+  Box<bool> get _box => Hive.box<bool>('saved');
+
   @override
-  List<String> build() => List<String>.from(savedIds);
+  Set<String> build() => _box.keys.cast<String>().toSet();
 
   void toggle(String id) {
     if (state.contains(id)) {
-      state = state.where((x) => x != id).toList();
+      _box.delete(id);
+      state = Set.from(state)..remove(id);
     } else {
-      state = [id, ...state];
+      _box.put(id, true);
+      state = {...state, id};
     }
   }
 
   bool isSaved(String id) => state.contains(id);
 }
 
-final savedProvider = NotifierProvider<SavedNotifier, List<String>>(SavedNotifier.new);
-
-final savedContentProvider = Provider<List<Content>>((ref) {
+@riverpod
+Future<List<Media>> savedContent(Ref ref) async {
   final ids = ref.watch(savedProvider);
-  return ids.map((id) => contentById(id)).whereType<Content>().toList();
-});
+  final list = await ref.watch(catalogProvider.future);
+  return list.where((m) => ids.contains(m.id)).toList();
+}
 
 // ── Library — recent ──────────────────────────────────────────────────────────
 
-class RecentNotifier extends Notifier<List<WatchedItem>> {
-  @override
-  List<WatchedItem> build() => List<WatchedItem>.from(recentlyWatched);
+@riverpod
+class Recent extends _$Recent {
+  Box<WatchedItem> get _box => Hive.box<WatchedItem>('recent');
 
-  void markWatched(String contentId, {double progress = 0.0, String context = ''}) {
-    final updated = WatchedItem(
-      contentId: contentId,
-      watchedAt: 'Just now',
-      progress: progress,
-      context: context,
-    );
-    state = [
-      updated,
-      ...state.where((w) => w.contentId != contentId),
-    ];
+  @override
+  List<WatchedItem> build() => _box.values.toList()..sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
+
+  void markWatched(String mediaId, {double progress = 0.0, String context = ''}) {
+    final item = WatchedItem(contentId: mediaId, watchedAt: DateTime.now().toIso8601String(), progress: progress, context: context);
+    _box.put(mediaId, item);
+    state = [item, ...state.where((w) => w.contentId != mediaId)];
   }
 }
 
-final recentProvider = NotifierProvider<RecentNotifier, List<WatchedItem>>(RecentNotifier.new);
+@riverpod
+Future<List<(WatchedItem, Media)>> recentContent(Ref ref) async {
+  final recent = ref.watch(recentProvider);
+  final list = await ref.watch(catalogProvider.future);
+  final byId = {for (final m in list) m.id: m};
+  final result = <(WatchedItem, Media)>[];
+  for (final item in recent) {
+    final media = byId[item.contentId];
+    if (media != null) result.add((item, media));
+  }
+  return result;
+}
 
 // ── Library — downloads ───────────────────────────────────────────────────────
 
-class DownloadsNotifier extends Notifier<List<DownloadItem>> {
-  @override
-  List<DownloadItem> build() => List<DownloadItem>.from(downloads);
+@riverpod
+class Downloads extends _$Downloads {
+  Box<DownloadItem> get _box => Hive.box<DownloadItem>('downloads');
 
-  void remove(String contentId) {
-    state = state.where((d) => d.contentId != contentId).toList();
+  @override
+  List<DownloadItem> build() => _box.values.toList();
+
+  void add(String mediaId, {String quality = 'HD', String size = '—'}) {
+    final item = DownloadItem(contentId: mediaId, quality: quality, size: size, at: DateTime.now().toIso8601String());
+    _box.put(mediaId, item);
+    state = [item, ...state.where((d) => d.contentId != mediaId)];
+  }
+
+  void remove(String mediaId) {
+    _box.delete(mediaId);
+    state = state.where((d) => d.contentId != mediaId).toList();
   }
 }
 
-final downloadsProvider = NotifierProvider<DownloadsNotifier, List<DownloadItem>>(
-  DownloadsNotifier.new,
-);
+@riverpod
+Future<List<(DownloadItem, Media)>> downloadsContent(Ref ref) async {
+  final dls = ref.watch(downloadsProvider);
+  final list = await ref.watch(catalogProvider.future);
+  final byId = {for (final m in list) m.id: m};
+  final result = <(DownloadItem, Media)>[];
+  for (final dl in dls) {
+    final media = byId[dl.contentId];
+    if (media != null) result.add((dl, media));
+  }
+  return result;
+}
 
 // ── Requests ──────────────────────────────────────────────────────────────────
 
-class RequestsNotifier extends Notifier<List<ContentRequest>> {
+@riverpod
+class Requests extends _$Requests {
   @override
-  List<ContentRequest> build() => List<ContentRequest>.from(requestHistory);
+  List<ContentRequest> build() => [];
 
   void add(String title, String note) {
-    final id = 'r${state.length + 1}-${DateTime.now().millisecondsSinceEpoch}';
-    state = [
-      ContentRequest(
-        id: id,
-        title: title,
-        note: note,
-        status: RequestStatus.pending,
-        date: _today(),
-      ),
-      ...state,
-    ];
+    final id = 'r${DateTime.now().millisecondsSinceEpoch}';
+    state = [ContentRequest(id: id, title: title, note: note, status: RequestStatus.pending, date: _today()), ...state];
   }
 
   String _today() {
     final now = DateTime.now();
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[now.month - 1]} ${now.day}';
   }
 }
-
-final requestsProvider = NotifierProvider<RequestsNotifier, List<ContentRequest>>(
-  RequestsNotifier.new,
-);

@@ -4,47 +4,45 @@
 
 ## STANDING INSTRUCTION — End-of-Session Wrap-up
 
-When the conversation is clearly wrapping up (user says done, thanks, goodbye, or stops giving new tasks), output a ready-to-paste CLAUDE.md update block like this — **do not edit the file yourself, just print the block**:
-
-```
-CLAUDE.md UPDATE — paste into ## Current State and ## Session Log:
-
-### Completed (add these)
-- [x] ...
-
-### Pending (add/remove these)
-- [ ] ...
-
-Session Log row:
-| 2026-XX-XX | brief summary of what changed |
-```
-
-This costs zero extra tokens during the session. The user pastes it manually at the end.
+When the user explicitly passes an update prompt (e.g. "update the md"), **directly edit this file** — update `## Current State` and append a row to `## Session Log`. Do not print a paste block.
 
 ---
 
 ## What This App Is
 
 **Sinemax** — a streaming app for translated (dubbed) movies & series by Tanzanian/Kenyan DJs.
-Flutter app, dark theme, fully local mock data (no backend yet).
+Flutter app, dark theme, Supabase backend, Hive for local persistence.
 Flutter package name is `kitabu`; display name is `SINEMAX`.
 
 ---
 
-## Stack & Hard Rules
+## Stack
 
 | Concern | Choice |
 |---|---|
-| State management | `flutter_riverpod ^3.3.1` — **manual only**, no code generation |
+| State management | `flutter_riverpod ^3.3.1` + `riverpod_annotation` — `@riverpod` code generation via `build_runner` |
 | Navigation | `go_router` — `StatefulShellRoute.indexedStack` for 5 tabs |
+| Backend | `supabase_flutter` — tables: `media`, `files` |
+| Local persistence | `hive_ce` + `hive_ce_flutter` — boxes: `saved` (bool), `recent` (WatchedItem), `downloads` (DownloadItem) |
+| Models | `freezed_annotation` + `json_annotation` — `@freezed` on `Media`, `MediaFile`, `DiscoverFilter` |
 | Fonts | Barlow Condensed (display/headings) + DM Sans (body) via `google_fonts` |
-| Icons | Custom SVG via `flutter_svg` `SvgPicture.string()` — see `lib/widgets/sinemax_icon.dart` |
-| Video player | `chewie` + `video_player`, placeholder URL = BigBuckBunny MP4 |
+| Icons | Custom SVG via `flutter_svg` — see `lib/widgets/sinemax_icon.dart` |
+| Images | `cached_network_image_ce` — `CachedNetworkImage` throughout |
+| Video player | `chewie` + `video_player`, loads URL from `files` table; fallback = BigBuckBunny MP4 |
 | Animations | `flutter_animate` |
-| Data | 100% local mock — `lib/data/local_data.dart` |
+| Config | `flutter_dotenv` — `.env` file with `SUPABASE_URL` + `SUPABASE_ANON_KEY` |
 
-**NEVER use:** `@riverpod`, `@freezed`, `part` directives, `build_runner`, `json_serializable`, Supabase, `.env`.
-Those packages stay in `pubspec.yaml` for future use but generate nothing now.
+**Code generation is active.** After model/provider changes run:
+```
+dart run build_runner build --delete-conflicting-outputs
+```
+
+Generated files (do not edit manually):
+- `lib/data/providers.g.dart`
+- `lib/models/media.freezed.dart` + `media.g.dart`
+- `lib/models/discover_filter.freezed.dart`
+- `lib/models/library_item.g.dart`
+- `lib/hive_registrar.g.dart`
 
 ---
 
@@ -52,34 +50,33 @@ Those packages stay in `pubspec.yaml` for future use but generate nothing now.
 
 ```
 lib/
-├── main.dart               # Entry: ProviderScope + system UI
-├── app.dart                # GoRouter + SinemaxApp + _AppShell
+├── main.dart               # Entry: dotenv + Supabase.initialize + Hive init + ProviderScope
+├── app.dart                # GoRouter + SinemaxApp + _AppShell (PopScope + back-nav logic)
 ├── theme/
 │   └── app_theme.dart      # SinemaxColors, SinemaxTextStyles, buildSinemaxTheme()
 ├── models/
-│   ├── content.dart        # Content, PosterPalette, HomeRow
-│   ├── episode.dart        # Episode
-│   ├── dj.dart             # Dj (with .initials getter)
-│   ├── library_item.dart   # WatchedItem, DownloadItem
-│   └── request.dart        # ContentRequest, RequestStatus enum + extension
+│   ├── media.dart          # Media (@freezed + @JsonKey), MediaFile (@freezed), HomeRow (plain class)
+│   ├── discover_filter.dart # DiscoverFilter (@freezed) + DiscoverFilterX extension
+│   ├── library_item.dart   # WatchedItem (@HiveType typeId:0), DownloadItem (@HiveType typeId:1)
+│   └── request.dart        # ContentRequest (plain), RequestStatus enum + extension (label/color/note)
 ├── data/
-│   ├── local_data.dart     # All mock data: 28 titles, 12 DJs, 8 home rows, library, requests, profile
-│   └── providers.dart      # All Riverpod providers
+│   └── providers.dart      # All @riverpod providers (all catalog providers are async/Future-based)
 └── widgets/
-    ├── sinemax_icon.dart    # SinemaxIcon widget (SVG string, 35 icons + filled nav variants)
-    ├── bottom_nav_bar.dart  # SinemaxBottomNav — UNDERLINE variant, inline in Scaffold
-    ├── poster_card.dart     # PosterCard — type badge top-left, centered glyph, DJ chip bottom, title+meta BELOW card
-    ├── movie_card.dart      # MovieCard — horizontal list card
-    └── section_header.dart  # SectionHeader — title + subtitle + "See All >" link
+    ├── sinemax_icon.dart    # SinemaxIcon widget (SVG string icons)
+    ├── bottom_nav_bar.dart  # SinemaxBottomNav — UNDERLINE variant
+    ├── poster_card.dart     # PosterCard — notch-clipped image, DJ badge top-right, type badge top-left, title+meta below
+    ├── movie_card.dart      # MovieCard — horizontal list row with mini poster + progress bar
+    ├── section_header.dart  # SectionHeader — title + "See All >" link
+    └── sinemax_search_bar.dart # SinemaxSearchBar — tappable bar that pushes /search
 screens/
-    ├── splash_screen.dart   # Pulse animation (flutter_animate), auto-nav to /home after 2.8s
-    ├── home_screen.dart     # SX badge + search bar app bar; hero: MOST WATCHED badge + Watch/+ buttons; 8 home rows
-    ├── discover_screen.dart # Filter chips (year/type/country/DJ) + 3-col grid
-    ├── search_screen.dart   # Auto-focus search, results grid
-    ├── detail_screen.dart   # Fixed zone: player + Download/Save/Share buttons; scrollable: info + sticky episodes header (SliverAppBar pinned) + expand/collapse (horizontal cards ↔ vertical list) + RELATED
-    ├── requests_screen.dart # Request form + history list
-    ├── library_screen.dart  # 3 tabs: Recent / Saved / Downloads
-    └── profile_screen.dart  # Avatar + stats + subscription + settings
+    ├── splash_screen.dart   # Pulse + shimmer animation (flutter_animate), auto-nav to /home after 2.8s
+    ├── home_screen.dart     # SX badge + search bar app bar; category rows grouped by country from homeRowsProvider
+    ├── discover_screen.dart # Filter chips (year/type/country/DJ) via bottom-sheet picker + 3-col grid
+    ├── search_screen.dart   # Auto-focus search, async results grid
+    ├── detail_screen.dart   # Fixed zone: player (real URL from files table) + Download/Save/Share; scrollable: info chips + sticky episodes header + expand/collapse (horizontal cards ↔ vertical list) + RELATED
+    ├── requests_screen.dart # Request form (title + notes) + in-memory history list
+    ├── library_screen.dart  # Pill tab bar: Recent / Saved / Downloads (all Hive-backed)
+    └── profile_screen.dart  # Avatar card + live stats + subscription card + settings tiles + logout
 ```
 
 ---
@@ -101,34 +98,50 @@ screens/
 
 ## Key Providers (lib/data/providers.dart)
 
+All catalog/content providers are `AsyncNotifierProvider` / `FutureProvider` hitting Supabase.
+Library providers are synchronous `NotifierProvider` backed by Hive boxes.
+
 ```dart
-catalogProvider           // Provider<List<Content>>  — read-only
-djsProvider               // Provider<List<Dj>>
-homeRowsProvider          // Provider<List<HomeRow>>
-featuredProvider          // Provider<Content?> — featured = 'ks2' (Throne of Shadows)
-discoverFiltersProvider   // NotifierProvider<DiscoverNotifier, DiscoverFilters>
-discoverResultsProvider   // Provider<List<Content>> — derived from filters
-searchQueryProvider       // NotifierProvider<SearchNotifier, String>
-searchResultsProvider     // Provider<List<Content>>
-savedProvider             // NotifierProvider<SavedNotifier, List<String>>
-savedContentProvider      // Provider<List<Content>>
-recentProvider            // NotifierProvider<RecentNotifier, List<WatchedItem>>
-downloadsProvider         // NotifierProvider<DownloadsNotifier, List<DownloadItem>>
-requestsProvider          // NotifierProvider<RequestsNotifier, List<ContentRequest>>
+// Catalog (Supabase → async)
+catalogProvider               // FutureProvider<List<Media>>  — SELECT * FROM media ORDER BY title
+mediaByIdProvider(id)         // FutureProvider<Media?>
+homeRowsProvider              // FutureProvider<List<HomeRow>> — groups catalog by country
+mediaFilesProvider(mediaId)   // FutureProvider<List<MediaFile>> — SELECT FROM files WHERE media_id = ?
+relatedMediaProvider(mediaId) // FutureProvider<List<Media>> — same country or genre, max 6
+
+// Filter options (derived from catalog, async)
+filterYearsProvider           // FutureProvider<List<String>>
+filterDjsProvider             // FutureProvider<List<String>>
+filterCountriesProvider       // FutureProvider<List<String>>
+
+// Discover (sync filter state + async results)
+discoverFiltersProvider       // NotifierProvider<DiscoverFilters, DiscoverFilter>
+discoverResultsProvider       // FutureProvider<List<Media>> — filtered catalog
+
+// Search (sync query state + async results)
+searchQueryProvider           // NotifierProvider<SearchQuery, String>
+searchResultsProvider         // FutureProvider<List<Media>>
+
+// Library — Hive-backed (sync)
+savedProvider                 // NotifierProvider<Saved, Set<String>>    — box: 'saved'
+savedContentProvider          // FutureProvider<List<Media>>
+recentProvider                // NotifierProvider<Recent, List<WatchedItem>> — box: 'recent'
+recentContentProvider         // FutureProvider<List<(WatchedItem, Media)>>
+downloadsProvider             // NotifierProvider<Downloads, List<DownloadItem>> — box: 'downloads'
+downloadsContentProvider      // FutureProvider<List<(DownloadItem, Media)>>
+
+// Requests (in-memory, not persisted)
+requestsProvider              // NotifierProvider<Requests, List<ContentRequest>>
 ```
 
 ---
 
-## Mock Data Summary (lib/data/local_data.dart)
+## Supabase Schema
 
-- **12 DJs**: dj-afande, dj-kibinda, dj-mzee, dj-salama, dj-honest, dj-pamoja, dj-rocky, dj-nash, dj-tamaa, dj-boss, dj-cartoon, dj-malkia
-- **28 content items**: ks1–ks6 (Korean series), is1–is4 (Indian series), ts1–ts2 (Turkish series), km1–km4 (Korean movies), im1–im2 (Indian movies), bm1–bm6 (Bongo movies), hw1–hw4 (Hollywood)
-- Featured: `featuredId = 'ks2'`
-- Library: 6 recent watches, 9 saved IDs, 5 downloads
-- 3 request history items
-- Profile: Amani Mushi, Premium plan
-
-Lookup helpers: `contentById(id)`, `djById(id)`, `contentWhere(fn)`
+| Table | Key columns |
+|---|---|
+| `media` | `id`, `title`, `poster_url`, `description`, `country`, `year`, `type` ('movie'/'series'), `genres` (array), `tags` (array), `dj`, `view_count`, `download_count` |
+| `files` | `id`, `media_id`, `season`, `label`, `download_url`, `created_at` |
 
 ---
 
@@ -136,7 +149,7 @@ Lookup helpers: `contentById(id)`, `djById(id)`, `contentWhere(fn)`
 
 ```
 sinemax app ui/
-├── data.js              # Full mock data (already ported to local_data.dart)
+├── data.js              # Full mock data (reference only — real data now in Supabase)
 ├── sinemax-parts.jsx    # Component designs — bottom nav variants (underline selected)
 ├── sinemax-icons.jsx    # SVG icon paths (already ported to sinemax_icon.dart)
 └── tweaks-panel.jsx     # Design tweaks — inline nav, pulse splash
@@ -147,17 +160,23 @@ sinemax app ui/
 ## Theme Quick Reference
 
 ```dart
-SinemaxColors.bg        // #050D1A  — main background
-SinemaxColors.bg2       // #0A1628  — nav bar background
-SinemaxColors.panel     // #0E1D33  — cards
-SinemaxColors.panel2    // #11233D  — chip backgrounds
-SinemaxColors.blue      // #2D8EFF  — primary accent
-SinemaxColors.muted     // #8FA6C8  — secondary text
-SinemaxColors.muted2    // #5E7298  — tertiary text
-SinemaxColors.gold      // #F4C13B  — star ratings
-SinemaxColors.teal      // #22D3A6  — success/added status
-SinemaxColors.red       // #FF5D7A  — danger/logout
-SinemaxColors.purple    // #7C5CFF  — secondary accent
+SinemaxColors.bg         // #050D1A  — main background
+SinemaxColors.bg2        // #0A1628  — nav bar background
+SinemaxColors.panel      // #0E1D33  — cards
+SinemaxColors.panel2     // #11233D  — chip backgrounds
+SinemaxColors.line       // rgba(120,160,220, 0.14) — subtle borders
+SinemaxColors.line2      // rgba(120,160,220, 0.26) — stronger borders
+SinemaxColors.blue       // #2D8EFF  — primary accent
+SinemaxColors.blueBright // #19C3FB  — gradient highlight
+SinemaxColors.blueDeep   // #1A6FE8  — pressed state
+SinemaxColors.ink        // #EAF2FF  — primary text (default color)
+SinemaxColors.muted      // #8FA6C8  — secondary text
+SinemaxColors.muted2     // #5E7298  — tertiary text
+SinemaxColors.gold       // #F4C13B  — star ratings / premium crown
+SinemaxColors.teal       // #22D3A6  — success / added status
+SinemaxColors.red        // #FF5D7A  — danger / logout
+SinemaxColors.orange     // #FF8A3D  — warning
+SinemaxColors.purple     // #7C5CFF  — secondary accent
 
 SinemaxTextStyles.display(size, weight, color)  // Barlow Condensed
 SinemaxTextStyles.body(size, weight, color)     // DM Sans
@@ -167,22 +186,20 @@ SinemaxTextStyles.body(size, weight, color)     // DM Sans
 
 ## Current State
 
-**Last updated: 2026-06-06**
+**Last updated: 2026-06-08**
 
 ### Completed
-- [x] `pubspec.yaml` — all dependencies added (video_player, chewie, flutter_riverpod ^3.3.1, go_router, flutter_animate, flutter_svg, google_fonts, skeletonizer, etc.)
-- [x] All model files
-- [x] `lib/data/local_data.dart` — full mock data
-- [x] `lib/data/providers.dart` — all Riverpod providers
-- [x] All 5 widgets
+- [x] `pubspec.yaml` — full dependency set: riverpod + codegen, supabase_flutter, hive_ce, freezed, cached_network_image_ce, flutter_dotenv, chewie/video_player, flutter_animate, go_router, google_fonts
+- [x] All model files (`media.dart`, `discover_filter.dart`, `library_item.dart`, `request.dart`)
+- [x] `lib/data/providers.dart` — all @riverpod providers, async/Supabase-backed catalog, Hive-backed library
+- [x] All 5 widgets (`sinemax_icon`, `bottom_nav_bar`, `poster_card`, `movie_card`, `section_header`)
 - [x] All 8 screens (splash, home, discover, search, detail, requests, library, profile)
-- [x] `lib/main.dart` + `lib/app.dart`
-- [x] `flutter analyze` — **0 issues**
-- [x] **UI redesign pass** — `poster_card`, `section_header`, `home_screen`, `detail_screen` updated to match design photos
-- [x] `lib/widgets/poster_card.dart` — redesigned: SERIES/MOVIE type badge, centered glyph, DJ name chip inside card; title + year · country · rating rendered below card
-- [x] `lib/widgets/section_header.dart` — "See All >" label (was "See all")
-- [x] `lib/screens/home_screen.dart` — new app bar (SX badge + tappable search bar + blue search button); featured hero shows "MOST WATCHED THIS WEEK" star badge, year·genre·DJname meta line, pill Watch button + circular "+" button; rows show "See All >"
-- [x] `lib/screens/detail_screen.dart` — fixed top zone (player + Download/Save/Share action buttons); scrollable zone with `MediaQuery.removePadding(removeTop:true)` + `CustomScrollView`; episodes header uses `SliverAppBar(pinned:true)` to stick below fixed zone; Expand/Collapse toggles horizontal card scroll ↔ full-width vertical episode list; RELATED section hidden when episodes expanded; `_EpisodesHeader`, `_EpisodeRow`, `_EpisodeCard`, `_ActionBtn` private widgets
+- [x] `lib/main.dart` — Supabase.initialize + Hive init + adapter registration
+- [x] `lib/app.dart` — GoRouter + _AppShell with PopScope back-nav + exit dialog
+- [x] **Backend migration** — replaced `local_data.dart` + `content/dj/episode` models with Supabase queries + `Media`/`MediaFile` freezed models
+- [x] **Code generation wired up** — `@riverpod`, `@freezed`, `@HiveType` all active; generated files committed
+- [x] **UI redesign pass** — poster cards (notch clipper + DJ badge), home screen (SX badge + category rows by country), detail screen (fixed player zone + sticky episodes + expand/collapse)
+- [x] Theme expanded — added `blueBright`, `blueDeep`, `ink`, `orange`, `line`, `line2`, DJ accent palette
 
 ### Pending / Requested Modifications
 - [ ] *(add user-requested changes here after each session)*
@@ -196,3 +213,4 @@ SinemaxTextStyles.body(size, weight, color)     // DM Sans
 | 2026-06-05 | Initial build — full app scaffolded: models, data, providers, 5 widgets, 8 screens, router, theme |
 | 2026-06-06 | Set up CLAUDE.md auto-update system |
 | 2026-06-06 | UI redesign: poster cards, home screen app bar + hero, detail screen fixed/scroll layout, sticky episodes header, expand/collapse episode list |
+| 2026-06-08 | Major backend migration: replaced local mock data with Supabase; new Media/MediaFile freezed models; @riverpod code generation; Hive persistence for library; updated all providers to async; expanded theme colors |

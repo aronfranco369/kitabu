@@ -1,13 +1,16 @@
+import 'dart:async';
+
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../data/providers.dart';
-import '../data/local_data.dart';
-import '../models/content.dart';
+import '../models/media.dart';
 import '../theme/app_theme.dart';
+import '../widgets/home_skeleton.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
-import '../widgets/sinemax_icon.dart';
 import '../widgets/sinemax_search_bar.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -15,8 +18,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final featured = ref.watch(featuredProvider);
-    final rows = ref.watch(homeRowsProvider);
+    final homeRowsAsync = ref.watch(homeRowsProvider);
 
     return Scaffold(
       backgroundColor: SinemaxColors.bg,
@@ -34,7 +36,6 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  // SX badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                     decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(6)),
@@ -50,11 +51,24 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
 
-          // Featured hero
-          if (featured != null) SliverToBoxAdapter(child: _FeaturedHero(content: featured)),
+          // Trending carousel
+          const SliverToBoxAdapter(child: _TrendingCarousel()),
 
-          // Home rows
-          ...rows.map((row) => SliverToBoxAdapter(child: _HomeRow(row: row))),
+          // Category rows
+          ...homeRowsAsync.when(
+            loading: () => [const SliverToBoxAdapter(child: HomeRowsSkeleton())],
+            error: (e, _) => [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Text('Failed to load content', style: SinemaxTextStyles.body(15, color: SinemaxColors.muted)),
+                  ),
+                ),
+              ),
+            ],
+            data: (rows) => rows.map((row) => SliverToBoxAdapter(child: _HomeRow(row: row))).toList(),
+          ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
@@ -63,123 +77,235 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _FeaturedHero extends StatelessWidget {
-  final Content content;
-  const _FeaturedHero({required this.content});
+class _HomeRow extends StatelessWidget {
+  final HomeRow row;
+  const _HomeRow({required this.row});
 
   @override
   Widget build(BuildContext context) {
-    final p = content.poster;
-    final dj = djById(content.djId);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: row.title, onSeeAll: () => context.go('/discover')),
+        SizedBox(
+          height: 202,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: row.items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) => PosterCard(media: row.items[i], onTap: () => context.push('/detail/${row.items[i].id}')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Trending Carousel ────────────────────────────────────────────────────────
+
+class _TrendingCarousel extends ConsumerStatefulWidget {
+  const _TrendingCarousel();
+
+  @override
+  ConsumerState<_TrendingCarousel> createState() => _TrendingCarouselState();
+}
+
+class _TrendingCarouselState extends ConsumerState<_TrendingCarousel> {
+  late final PageController _controller;
+  int _page = 0;
+  List<Media> _items = const [];
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+    _timer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
+      if (!mounted || _items.isEmpty) return;
+      final next = (_page + 1) % _items.length;
+      _controller.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ref
+        .watch(trendingMediaProvider)
+        .when(
+          loading: () => const HomeTrendingSkeleton(),
+          error: (_, _) => const SizedBox.shrink(),
+          data: (items) {
+            _items = items;
+            if (items.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 210,
+                    child: PageView.builder(
+                      controller: _controller,
+                      itemCount: items.length,
+                      onPageChanged: (i) => setState(() => _page = i),
+                      itemBuilder: (_, i) => _TrendingCard(media: items[i]),
+                    ),
+                  ),
+                  if (items.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, left: 20),
+                      child: Row(
+                        children: List.generate(items.length, (i) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(right: 5),
+                            width: i == _page ? 18 : 5,
+                            height: 5,
+                            decoration: BoxDecoration(color: i == _page ? SinemaxColors.blue : SinemaxColors.muted2, borderRadius: BorderRadius.circular(3)),
+                          );
+                        }),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+  }
+}
+
+class _TrendingCard extends ConsumerWidget {
+  final Media media;
+  const _TrendingCard({required this.media});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSaved = ref.watch(savedProvider).contains(media.id);
 
     return GestureDetector(
-      onTap: () => context.push('/detail/${content.id}'),
+      onTap: () => context.push('/detail/${media.id}'),
       child: Container(
-        height: 280,
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.from, p.to]),
-        ),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: SinemaxColors.panel),
+        clipBehavior: Clip.hardEdge,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Big glyph watermark
-            Positioned(
-              right: -10,
-              top: -10,
-              child: Text(p.glyph, style: TextStyle(fontSize: 160, color: p.accent.withAlpha(25), height: 1)),
-            ),
+            // Poster as background
+            if (media.posterUrl != null)
+              CachedNetworkImage(
+                imageUrl: media.posterUrl!,
+                fit: BoxFit.cover,
+                alignment: Alignment.centerRight,
+                placeholder: (_, _) => Container(color: SinemaxColors.panel2),
+                errorBuilder: (_, _, _) => Container(color: SinemaxColors.panel2),
+              )
+            else
+              Container(color: SinemaxColors.panel2),
 
-            // Accent bar at top
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  color: p.accent,
-                ),
+            // Left gradient so text stays readable
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, stops: [0.0, 0.55, 1.0], colors: [Color(0xF2050D1A), Color(0xD0050D1A), Colors.transparent]),
               ),
             ),
 
-            // Content
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
+            // Bottom gradient
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, stops: [0.0, 0.45], colors: [Color(0x99000000), Colors.transparent]),
+              ),
+            ),
+
+            // Content overlay
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // "Most watched" badge
+                  // Label
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star_rounded, size: 12, color: p.accent),
+                      const Icon(Icons.star_rounded, size: 13, color: SinemaxColors.gold),
                       const SizedBox(width: 5),
                       Text(
                         'MOST WATCHED THIS WEEK',
-                        style: SinemaxTextStyles.body(10, weight: FontWeight.w700, color: p.accent),
+                        style: SinemaxTextStyles.body(10, weight: FontWeight.w700, color: SinemaxColors.gold),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-
-                  // Title
-                  Text(content.title, style: SinemaxTextStyles.display(34, weight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-
-                  // Year · genre · DJ name
-                  RichText(
-                    text: TextSpan(
-                      style: SinemaxTextStyles.body(12, color: SinemaxColors.muted),
+                  if (media.viewCount > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
                       children: [
-                        TextSpan(text: '${content.year} · ${content.genre}'),
-                        if (dj != null) ...[
-                          const TextSpan(text: ' · '),
-                          TextSpan(
-                            text: dj.name,
-                            style: SinemaxTextStyles.body(12, weight: FontWeight.w600, color: p.accent),
-                          ),
-                        ],
+                        Icon(Icons.remove_red_eye_outlined, size: 12, color: SinemaxColors.muted),
+                        const SizedBox(width: 4),
+                        Text(
+                          _fmtCount(media.viewCount),
+                          style: SinemaxTextStyles.body(10, weight: FontWeight.w600, color: SinemaxColors.muted),
+                        ),
                       ],
                     ),
+                  ],
+                  const Spacer(),
+                  // Title
+                  Text(
+                    media.title.toUpperCase(),
+                    style: SinemaxTextStyles.display(28, weight: FontWeight.w800),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  // Meta
+                  Text(
+                    [if (media.year != null) '${media.year}', ...media.genres.take(2), if (media.djDisplay.isNotEmpty) media.djDisplay].join(' · '),
+                    style: SinemaxTextStyles.body(12, color: SinemaxColors.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 14),
-
-                  // Buttons
+                  // Action buttons
                   Row(
                     children: [
-                      // Watch button
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-                        decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(20)),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SinemaxIcon('play', size: 13, color: Colors.white),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Watch',
-                              style: SinemaxTextStyles.body(14, weight: FontWeight.w600, color: Colors.white),
-                            ),
-                          ],
+                      GestureDetector(
+                        onTap: () => context.push('/detail/${media.id}'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                          decoration: BoxDecoration(color: SinemaxColors.blue, borderRadius: BorderRadius.circular(22)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.play_arrow_rounded, size: 17, color: Colors.white),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Watch',
+                                style: SinemaxTextStyles.body(13, weight: FontWeight.w700, color: Colors.white),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // + button
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.black38,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: SinemaxColors.line2, width: 1),
+                      GestureDetector(
+                        onTap: () => ref.read(savedProvider.notifier).toggle(media.id),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: isSaved ? SinemaxColors.teal : SinemaxColors.line2, width: 1.5),
+                            color: Colors.black26,
+                          ),
+                          child: Icon(isSaved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded, size: 18, color: isSaved ? SinemaxColors.teal : Colors.white),
                         ),
-                        child: const Center(child: SinemaxIcon('plus', size: 16)),
                       ),
                     ],
                   ),
@@ -191,31 +317,6 @@ class _FeaturedHero extends StatelessWidget {
       ),
     );
   }
-}
 
-class _HomeRow extends ConsumerWidget {
-  final dynamic row;
-  const _HomeRow({required this.row});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = (row.itemIds as List<String>).map((id) => contentById(id)).whereType<Content>().toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionHeader(title: row.title, onSeeAll: () => context.go('/discover')),
-        SizedBox(
-          height: 202,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => PosterCard(content: items[i], onTap: () => context.push('/detail/${items[i].id}')),
-          ),
-        ),
-      ],
-    );
-  }
+  String _fmtCount(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(0)}K' : '$n';
 }
