@@ -1,29 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/discover_filter.dart';
 import '../models/library_item.dart';
 import '../models/media.dart';
 import '../models/request.dart';
 import '../utils/row_labels.dart';
+import 'files_notifier.dart';
+import 'media_notifier.dart';
+
+export 'files_notifier.dart' show filesProvider, FilesNotifier;
+export 'media_notifier.dart' show mediaProvider, MediaNotifier;
 
 part 'providers.g.dart';
-
-SupabaseClient get _db => Supabase.instance.client;
 
 // ── Catalog ───────────────────────────────────────────────────────────────────
 
 @riverpod
-Future<List<Media>> catalog(Ref ref) async {
-  final data = await _db.from('media').select().order('title');
-  return (data as List).map((row) => Media.fromJson(row as Map<String, dynamic>)).toList();
-}
-
-@riverpod
 Future<Media?> mediaById(Ref ref, String id) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   try {
     return list.firstWhere((m) => m.id == id);
   } catch (_) {
@@ -33,7 +29,7 @@ Future<Media?> mediaById(Ref ref, String id) async {
 
 @riverpod
 Future<List<HomeRow>> homeRows(Ref ref) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final Map<String, List<Media>> groups = {};
   for (final m in list) {
     final country = m.countryDisplay;
@@ -41,22 +37,41 @@ Future<List<HomeRow>> homeRows(Ref ref) async {
     final key = '${country.toUpperCase()} ${m.isSeries ? 'SERIES' : 'MOVIES'}';
     groups.putIfAbsent(key, () => []).add(m);
   }
+  int rowScore(List<Media> items) {
+    final sorted = [...items]..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    return sorted.take(20).fold(0, (sum, m) => sum + m.viewCount);
+  }
+
   return (groups.entries.where((e) => e.value.length >= 2).map((e) {
     final lookupKey = e.key.toLowerCase();
     final title = (kRowLabels[lookupKey]?.isNotEmpty == true) ? kRowLabels[lookupKey]! : e.key;
-    return HomeRow(id: e.key.toLowerCase().replaceAll(' ', '-'), title: title, items: e.value);
+    final sorted = [...e.value]..sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    return HomeRow(id: e.key.toLowerCase().replaceAll(' ', '-'), title: title, items: sorted);
   }).toList()
-    ..sort((a, b) => b.items.length.compareTo(a.items.length)));
+    ..sort((a, b) => rowScore(b.items).compareTo(rowScore(a.items))));
 }
 
+/// Files for a specific media — reads from Hive via FilesNotifier.
+/// Triggers a background Supabase fetch on first access for this mediaId.
 @riverpod
 Future<List<MediaFile>> mediaFiles(Ref ref, String mediaId) async {
-  final data = await _db.from('files').select().eq('media_id', mediaId).order('episode_number', ascending: true, nullsFirst: false).order('label', ascending: true, nullsFirst: false);
-  return (data as List).map((row) => MediaFile.fromJson(row as Map<String, dynamic>)).toList();
+  // Fire-and-forget: fetch from Supabase if this mediaId isn't cached yet
+  Future.microtask(() => ref.read(filesProvider.notifier).ensureLoaded(mediaId));
+  // Watch the full files box; re-runs automatically when new files are added
+  final all = await ref.watch(filesProvider.future);
+  return all
+      .where((f) => f.mediaId == mediaId)
+      .toList()
+    ..sort((a, b) {
+      final epA = a.episodeNumber ?? 999;
+      final epB = b.episodeNumber ?? 999;
+      if (epA != epB) return epA.compareTo(epB);
+      return (a.label ?? '').compareTo(b.label ?? '');
+    });
 }
 
 final trendingMediaProvider = FutureProvider<List<Media>>((ref) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final withViews = list.where((m) => m.viewCount > 0).toList()
     ..sort((a, b) => b.viewCount.compareTo(a.viewCount));
   return withViews.take(5).toList();
@@ -64,10 +79,16 @@ final trendingMediaProvider = FutureProvider<List<Media>>((ref) async {
 
 @riverpod
 Future<List<Media>> relatedMedia(Ref ref, String mediaId) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   try {
     final media = list.firstWhere((m) => m.id == mediaId);
-    return list.where((m) => m.id != mediaId && (m.country == media.country || (m.genres.isNotEmpty && media.genres.isNotEmpty && m.genres.first == media.genres.first))).take(6).toList();
+    return list
+        .where((m) =>
+            m.id != mediaId &&
+            (m.country == media.country ||
+                (m.genres.isNotEmpty && media.genres.isNotEmpty && m.genres.first == media.genres.first)))
+        .take(6)
+        .toList();
   } catch (_) {
     return [];
   }
@@ -77,21 +98,22 @@ Future<List<Media>> relatedMedia(Ref ref, String mediaId) async {
 
 @riverpod
 Future<List<String>> filterYears(Ref ref) async {
-  final list = await ref.watch(catalogProvider.future);
-  final years = list.map((m) => m.year?.toString() ?? '').where((y) => y.isNotEmpty).toSet().toList()..sort((a, b) => b.compareTo(a));
+  final list = await ref.watch(mediaProvider.future);
+  final years = list.map((m) => m.year?.toString() ?? '').where((y) => y.isNotEmpty).toSet().toList()
+    ..sort((a, b) => b.compareTo(a));
   return ['All', ...years];
 }
 
 @riverpod
 Future<List<String>> filterDjs(Ref ref) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final djs = list.map((m) => m.dj ?? '').where((d) => d.isNotEmpty).toSet().toList()..sort();
   return ['All', ...djs];
 }
 
 @riverpod
 Future<List<String>> filterCountries(Ref ref) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final countries = list.map((m) => m.countryDisplay).where((c) => c.isNotEmpty).toSet().toList()..sort();
   return ['All', ...countries];
 }
@@ -113,10 +135,9 @@ class DiscoverFilters extends _$DiscoverFilters {
 
 @riverpod
 Future<List<Media>> discoverResults(Ref ref) async {
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final filters = ref.watch(discoverFiltersProvider);
-  if (filters.isDefault) return list;
-  return list.where((m) {
+  final base = filters.isDefault ? list : list.where((m) {
     if (filters.year != 'All' && m.year?.toString() != filters.year) return false;
     if (filters.dj != 'All' && m.dj != filters.dj) return false;
     if (filters.country != 'All' && m.countryDisplay != filters.country) return false;
@@ -126,6 +147,7 @@ Future<List<Media>> discoverResults(Ref ref) async {
     }
     return true;
   }).toList();
+  return base..sort((a, b) => b.viewCount.compareTo(a.viewCount));
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -142,9 +164,12 @@ class SearchQuery extends _$SearchQuery {
 Future<List<Media>> searchResults(Ref ref) async {
   final q = ref.watch(searchQueryProvider).trim().toLowerCase();
   if (q.isEmpty) return [];
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   return list.where((m) {
-    return m.title.toLowerCase().contains(q) || m.genres.any((g) => g.toLowerCase().contains(q)) || m.countryDisplay.toLowerCase().contains(q) || (m.dj?.toLowerCase().contains(q) ?? false);
+    return m.title.toLowerCase().contains(q) ||
+        m.genres.any((g) => g.toLowerCase().contains(q)) ||
+        m.countryDisplay.toLowerCase().contains(q) ||
+        (m.dj?.toLowerCase().contains(q) ?? false);
   }).toList();
 }
 
@@ -173,7 +198,7 @@ class Saved extends _$Saved {
 @riverpod
 Future<List<Media>> savedContent(Ref ref) async {
   final ids = ref.watch(savedProvider);
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   return list.where((m) => ids.contains(m.id)).toList();
 }
 
@@ -187,7 +212,11 @@ class Recent extends _$Recent {
   List<WatchedItem> build() => _box.values.toList()..sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
 
   void markWatched(String mediaId, {double progress = 0.0, String context = ''}) {
-    final item = WatchedItem(contentId: mediaId, watchedAt: DateTime.now().toIso8601String(), progress: progress, context: context);
+    final item = WatchedItem(
+        contentId: mediaId,
+        watchedAt: DateTime.now().toIso8601String(),
+        progress: progress,
+        context: context);
     _box.put(mediaId, item);
     state = [item, ...state.where((w) => w.contentId != mediaId)];
   }
@@ -196,7 +225,7 @@ class Recent extends _$Recent {
 @riverpod
 Future<List<(WatchedItem, Media)>> recentContent(Ref ref) async {
   final recent = ref.watch(recentProvider);
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final byId = {for (final m in list) m.id: m};
   final result = <(WatchedItem, Media)>[];
   for (final item in recent) {
@@ -230,7 +259,7 @@ class Downloads extends _$Downloads {
 @riverpod
 Future<List<(DownloadItem, Media)>> downloadsContent(Ref ref) async {
   final dls = ref.watch(downloadsProvider);
-  final list = await ref.watch(catalogProvider.future);
+  final list = await ref.watch(mediaProvider.future);
   final byId = {for (final m in list) m.id: m};
   final result = <(DownloadItem, Media)>[];
   for (final dl in dls) {

@@ -3,6 +3,126 @@
 part of 'media.dart';
 
 // **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class MediaHiveAdapter extends TypeAdapter<_Media> {
+  @override
+  final typeId = 2;
+
+  @override
+  _Media read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return _Media(
+      id: fields[0] as String,
+      title: fields[1] as String,
+      posterUrl: fields[2] as String?,
+      description: fields[3] as String?,
+      country: fields[4] as String?,
+      year: (fields[5] as num?)?.toInt(),
+      type: fields[6] == null ? 'movie' : fields[6] as String,
+      genres: fields[7] == null ? const [] : (fields[7] as List).cast<String>(),
+      tags: fields[8] == null ? const [] : (fields[8] as List).cast<String>(),
+      dj: fields[9] as String?,
+      viewCount: fields[10] == null ? 0 : (fields[10] as num).toInt(),
+      downloadCount: fields[11] == null ? 0 : (fields[11] as num).toInt(),
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, _Media obj) {
+    writer
+      ..writeByte(12)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.title)
+      ..writeByte(2)
+      ..write(obj.posterUrl)
+      ..writeByte(3)
+      ..write(obj.description)
+      ..writeByte(4)
+      ..write(obj.country)
+      ..writeByte(5)
+      ..write(obj.year)
+      ..writeByte(6)
+      ..write(obj.type)
+      ..writeByte(7)
+      ..write(obj.genres)
+      ..writeByte(8)
+      ..write(obj.tags)
+      ..writeByte(9)
+      ..write(obj.dj)
+      ..writeByte(10)
+      ..write(obj.viewCount)
+      ..writeByte(11)
+      ..write(obj.downloadCount);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaHiveAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class MediaFileHiveAdapter extends TypeAdapter<_MediaFile> {
+  @override
+  final typeId = 3;
+
+  @override
+  _MediaFile read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return _MediaFile(
+      id: fields[0] as String,
+      mediaId: fields[1] as String,
+      season: (fields[2] as num?)?.toInt(),
+      label: fields[3] as String?,
+      downloadUrl: fields[4] as String?,
+      episodeNumber: (fields[5] as num?)?.toInt(),
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, _MediaFile obj) {
+    writer
+      ..writeByte(6)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.mediaId)
+      ..writeByte(2)
+      ..write(obj.season)
+      ..writeByte(3)
+      ..write(obj.label)
+      ..writeByte(4)
+      ..write(obj.downloadUrl)
+      ..writeByte(5)
+      ..write(obj.episodeNumber);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaFileHiveAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+// **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 

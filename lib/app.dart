@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'data/fcm_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/discover_screen.dart';
@@ -53,9 +54,22 @@ class SinemaxApp extends StatelessWidget {
   }
 }
 
-class _AppShell extends StatelessWidget {
+class _AppShell extends StatefulWidget {
   final StatefulNavigationShell shell;
   const _AppShell({required this.shell});
+
+  @override
+  State<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<_AppShell> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FcmService.init(context);
+    });
+  }
 
   Future<void> _onBack(BuildContext context) async {
     final router = GoRouter.of(context);
@@ -65,8 +79,8 @@ class _AppShell extends StatelessWidget {
       return;
     }
 
-    if (shell.currentIndex != 0) {
-      shell.goBranch(0);
+    if (widget.shell.currentIndex != 0) {
+      widget.shell.goBranch(0);
       return;
     }
 
@@ -90,10 +104,10 @@ class _AppShell extends StatelessWidget {
       canPop: false,
       onPopInvokedWithResult: (_, _) => _onBack(context),
       child: Scaffold(
-        body: shell,
+        body: widget.shell,
         bottomNavigationBar: SinemaxBottomNav(
-          currentIndex: shell.currentIndex,
-          onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+          currentIndex: widget.shell.currentIndex,
+          onTap: (i) => widget.shell.goBranch(i, initialLocation: i == widget.shell.currentIndex),
         ),
       ),
     );

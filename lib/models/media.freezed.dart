@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Media {
 
- String get id; String get title;@JsonKey(name: 'poster_url') String? get posterUrl; String? get description; String? get country; int? get year; String get type; List<String> get genres; List<String> get tags; String? get dj;@JsonKey(name: 'view_count') int get viewCount;@JsonKey(name: 'download_count') int get downloadCount;
+@HiveField(0) String get id;@HiveField(1) String get title;@HiveField(2)@JsonKey(name: 'poster_url') String? get posterUrl;@HiveField(3) String? get description;@HiveField(4) String? get country;@HiveField(5) int? get year;@HiveField(6) String get type;@HiveField(7) List<String> get genres;@HiveField(8) List<String> get tags;@HiveField(9) String? get dj;@HiveField(10)@JsonKey(name: 'view_count') int get viewCount;@HiveField(11)@JsonKey(name: 'download_count') int get downloadCount;
 /// Create a copy of Media
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +48,7 @@ abstract mixin class $MediaCopyWith<$Res>  {
   factory $MediaCopyWith(Media value, $Res Function(Media) _then) = _$MediaCopyWithImpl;
 @useResult
 $Res call({
- String id, String title,@JsonKey(name: 'poster_url') String? posterUrl, String? description, String? country, int? year, String type, List<String> genres, List<String> tags, String? dj,@JsonKey(name: 'view_count') int viewCount,@JsonKey(name: 'download_count') int downloadCount
+@HiveField(0) String id,@HiveField(1) String title,@HiveField(2)@JsonKey(name: 'poster_url') String? posterUrl,@HiveField(3) String? description,@HiveField(4) String? country,@HiveField(5) int? year,@HiveField(6) String type,@HiveField(7) List<String> genres,@HiveField(8) List<String> tags,@HiveField(9) String? dj,@HiveField(10)@JsonKey(name: 'view_count') int viewCount,@HiveField(11)@JsonKey(name: 'download_count') int downloadCount
 });
 
 
@@ -164,7 +164,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String title, @JsonKey(name: 'poster_url')  String? posterUrl,  String? description,  String? country,  int? year,  String type,  List<String> genres,  List<String> tags,  String? dj, @JsonKey(name: 'view_count')  int viewCount, @JsonKey(name: 'download_count')  int downloadCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@HiveField(0)  String id, @HiveField(1)  String title, @HiveField(2)@JsonKey(name: 'poster_url')  String? posterUrl, @HiveField(3)  String? description, @HiveField(4)  String? country, @HiveField(5)  int? year, @HiveField(6)  String type, @HiveField(7)  List<String> genres, @HiveField(8)  List<String> tags, @HiveField(9)  String? dj, @HiveField(10)@JsonKey(name: 'view_count')  int viewCount, @HiveField(11)@JsonKey(name: 'download_count')  int downloadCount)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Media() when $default != null:
 return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.country,_that.year,_that.type,_that.genres,_that.tags,_that.dj,_that.viewCount,_that.downloadCount);case _:
@@ -185,7 +185,7 @@ return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.cou
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String title, @JsonKey(name: 'poster_url')  String? posterUrl,  String? description,  String? country,  int? year,  String type,  List<String> genres,  List<String> tags,  String? dj, @JsonKey(name: 'view_count')  int viewCount, @JsonKey(name: 'download_count')  int downloadCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@HiveField(0)  String id, @HiveField(1)  String title, @HiveField(2)@JsonKey(name: 'poster_url')  String? posterUrl, @HiveField(3)  String? description, @HiveField(4)  String? country, @HiveField(5)  int? year, @HiveField(6)  String type, @HiveField(7)  List<String> genres, @HiveField(8)  List<String> tags, @HiveField(9)  String? dj, @HiveField(10)@JsonKey(name: 'view_count')  int viewCount, @HiveField(11)@JsonKey(name: 'download_count')  int downloadCount)  $default,) {final _that = this;
 switch (_that) {
 case _Media():
 return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.country,_that.year,_that.type,_that.genres,_that.tags,_that.dj,_that.viewCount,_that.downloadCount);case _:
@@ -205,7 +205,7 @@ return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.cou
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String title, @JsonKey(name: 'poster_url')  String? posterUrl,  String? description,  String? country,  int? year,  String type,  List<String> genres,  List<String> tags,  String? dj, @JsonKey(name: 'view_count')  int viewCount, @JsonKey(name: 'download_count')  int downloadCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@HiveField(0)  String id, @HiveField(1)  String title, @HiveField(2)@JsonKey(name: 'poster_url')  String? posterUrl, @HiveField(3)  String? description, @HiveField(4)  String? country, @HiveField(5)  int? year, @HiveField(6)  String type, @HiveField(7)  List<String> genres, @HiveField(8)  List<String> tags, @HiveField(9)  String? dj, @HiveField(10)@JsonKey(name: 'view_count')  int viewCount, @HiveField(11)@JsonKey(name: 'download_count')  int downloadCount)?  $default,) {final _that = this;
 switch (_that) {
 case _Media() when $default != null:
 return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.country,_that.year,_that.type,_that.genres,_that.tags,_that.dj,_that.viewCount,_that.downloadCount);case _:
@@ -218,35 +218,35 @@ return $default(_that.id,_that.title,_that.posterUrl,_that.description,_that.cou
 
 /// @nodoc
 @JsonSerializable()
-
+@HiveType(typeId: 2, adapterName: 'MediaHiveAdapter')
 class _Media extends Media {
-  const _Media({required this.id, required this.title, @JsonKey(name: 'poster_url') this.posterUrl, this.description, this.country, this.year, this.type = 'movie', final  List<String> genres = const [], final  List<String> tags = const [], this.dj, @JsonKey(name: 'view_count') this.viewCount = 0, @JsonKey(name: 'download_count') this.downloadCount = 0}): _genres = genres,_tags = tags,super._();
+  const _Media({@HiveField(0) required this.id, @HiveField(1) required this.title, @HiveField(2)@JsonKey(name: 'poster_url') this.posterUrl, @HiveField(3) this.description, @HiveField(4) this.country, @HiveField(5) this.year, @HiveField(6) this.type = 'movie', @HiveField(7) final  List<String> genres = const [], @HiveField(8) final  List<String> tags = const [], @HiveField(9) this.dj, @HiveField(10)@JsonKey(name: 'view_count') this.viewCount = 0, @HiveField(11)@JsonKey(name: 'download_count') this.downloadCount = 0}): _genres = genres,_tags = tags,super._();
   factory _Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);
 
-@override final  String id;
-@override final  String title;
-@override@JsonKey(name: 'poster_url') final  String? posterUrl;
-@override final  String? description;
-@override final  String? country;
-@override final  int? year;
-@override@JsonKey() final  String type;
+@override@HiveField(0) final  String id;
+@override@HiveField(1) final  String title;
+@override@HiveField(2)@JsonKey(name: 'poster_url') final  String? posterUrl;
+@override@HiveField(3) final  String? description;
+@override@HiveField(4) final  String? country;
+@override@HiveField(5) final  int? year;
+@override@JsonKey()@HiveField(6) final  String type;
  final  List<String> _genres;
-@override@JsonKey() List<String> get genres {
+@override@JsonKey()@HiveField(7) List<String> get genres {
   if (_genres is EqualUnmodifiableListView) return _genres;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_genres);
 }
 
  final  List<String> _tags;
-@override@JsonKey() List<String> get tags {
+@override@JsonKey()@HiveField(8) List<String> get tags {
   if (_tags is EqualUnmodifiableListView) return _tags;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_tags);
 }
 
-@override final  String? dj;
-@override@JsonKey(name: 'view_count') final  int viewCount;
-@override@JsonKey(name: 'download_count') final  int downloadCount;
+@override@HiveField(9) final  String? dj;
+@override@HiveField(10)@JsonKey(name: 'view_count') final  int viewCount;
+@override@HiveField(11)@JsonKey(name: 'download_count') final  int downloadCount;
 
 /// Create a copy of Media
 /// with the given fields replaced by the non-null parameter values.
@@ -281,7 +281,7 @@ abstract mixin class _$MediaCopyWith<$Res> implements $MediaCopyWith<$Res> {
   factory _$MediaCopyWith(_Media value, $Res Function(_Media) _then) = __$MediaCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String title,@JsonKey(name: 'poster_url') String? posterUrl, String? description, String? country, int? year, String type, List<String> genres, List<String> tags, String? dj,@JsonKey(name: 'view_count') int viewCount,@JsonKey(name: 'download_count') int downloadCount
+@HiveField(0) String id,@HiveField(1) String title,@HiveField(2)@JsonKey(name: 'poster_url') String? posterUrl,@HiveField(3) String? description,@HiveField(4) String? country,@HiveField(5) int? year,@HiveField(6) String type,@HiveField(7) List<String> genres,@HiveField(8) List<String> tags,@HiveField(9) String? dj,@HiveField(10)@JsonKey(name: 'view_count') int viewCount,@HiveField(11)@JsonKey(name: 'download_count') int downloadCount
 });
 
 
@@ -323,7 +323,7 @@ as int,
 /// @nodoc
 mixin _$MediaFile {
 
- String get id;@JsonKey(name: 'media_id') String get mediaId; int? get season; String? get label;@JsonKey(name: 'download_url') String? get downloadUrl;@JsonKey(name: 'created_at') DateTime? get createdAt;@JsonKey(name: 'episode_number') int? get episodeNumber;
+@HiveField(0) String get id;@HiveField(1)@JsonKey(name: 'media_id') String get mediaId;@HiveField(2) int? get season;@HiveField(3) String? get label;@HiveField(4)@JsonKey(name: 'download_url') String? get downloadUrl;@JsonKey(name: 'created_at') DateTime? get createdAt;@HiveField(5)@JsonKey(name: 'episode_number') int? get episodeNumber;
 /// Create a copy of MediaFile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -356,7 +356,7 @@ abstract mixin class $MediaFileCopyWith<$Res>  {
   factory $MediaFileCopyWith(MediaFile value, $Res Function(MediaFile) _then) = _$MediaFileCopyWithImpl;
 @useResult
 $Res call({
- String id,@JsonKey(name: 'media_id') String mediaId, int? season, String? label,@JsonKey(name: 'download_url') String? downloadUrl,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'episode_number') int? episodeNumber
+@HiveField(0) String id,@HiveField(1)@JsonKey(name: 'media_id') String mediaId,@HiveField(2) int? season,@HiveField(3) String? label,@HiveField(4)@JsonKey(name: 'download_url') String? downloadUrl,@JsonKey(name: 'created_at') DateTime? createdAt,@HiveField(5)@JsonKey(name: 'episode_number') int? episodeNumber
 });
 
 
@@ -467,7 +467,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'media_id')  String mediaId,  int? season,  String? label, @JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'episode_number')  int? episodeNumber)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@HiveField(0)  String id, @HiveField(1)@JsonKey(name: 'media_id')  String mediaId, @HiveField(2)  int? season, @HiveField(3)  String? label, @HiveField(4)@JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @HiveField(5)@JsonKey(name: 'episode_number')  int? episodeNumber)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MediaFile() when $default != null:
 return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUrl,_that.createdAt,_that.episodeNumber);case _:
@@ -488,7 +488,7 @@ return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUr
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'media_id')  String mediaId,  int? season,  String? label, @JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'episode_number')  int? episodeNumber)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@HiveField(0)  String id, @HiveField(1)@JsonKey(name: 'media_id')  String mediaId, @HiveField(2)  int? season, @HiveField(3)  String? label, @HiveField(4)@JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @HiveField(5)@JsonKey(name: 'episode_number')  int? episodeNumber)  $default,) {final _that = this;
 switch (_that) {
 case _MediaFile():
 return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUrl,_that.createdAt,_that.episodeNumber);case _:
@@ -508,7 +508,7 @@ return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUr
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'media_id')  String mediaId,  int? season,  String? label, @JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @JsonKey(name: 'episode_number')  int? episodeNumber)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@HiveField(0)  String id, @HiveField(1)@JsonKey(name: 'media_id')  String mediaId, @HiveField(2)  int? season, @HiveField(3)  String? label, @HiveField(4)@JsonKey(name: 'download_url')  String? downloadUrl, @JsonKey(name: 'created_at')  DateTime? createdAt, @HiveField(5)@JsonKey(name: 'episode_number')  int? episodeNumber)?  $default,) {final _that = this;
 switch (_that) {
 case _MediaFile() when $default != null:
 return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUrl,_that.createdAt,_that.episodeNumber);case _:
@@ -521,18 +521,18 @@ return $default(_that.id,_that.mediaId,_that.season,_that.label,_that.downloadUr
 
 /// @nodoc
 @JsonSerializable()
-
+@HiveType(typeId: 3, adapterName: 'MediaFileHiveAdapter')
 class _MediaFile implements MediaFile {
-  const _MediaFile({required this.id, @JsonKey(name: 'media_id') required this.mediaId, this.season, this.label, @JsonKey(name: 'download_url') this.downloadUrl, @JsonKey(name: 'created_at') this.createdAt, @JsonKey(name: 'episode_number') this.episodeNumber});
+  const _MediaFile({@HiveField(0) required this.id, @HiveField(1)@JsonKey(name: 'media_id') required this.mediaId, @HiveField(2) this.season, @HiveField(3) this.label, @HiveField(4)@JsonKey(name: 'download_url') this.downloadUrl, @JsonKey(name: 'created_at') this.createdAt, @HiveField(5)@JsonKey(name: 'episode_number') this.episodeNumber});
   factory _MediaFile.fromJson(Map<String, dynamic> json) => _$MediaFileFromJson(json);
 
-@override final  String id;
-@override@JsonKey(name: 'media_id') final  String mediaId;
-@override final  int? season;
-@override final  String? label;
-@override@JsonKey(name: 'download_url') final  String? downloadUrl;
+@override@HiveField(0) final  String id;
+@override@HiveField(1)@JsonKey(name: 'media_id') final  String mediaId;
+@override@HiveField(2) final  int? season;
+@override@HiveField(3) final  String? label;
+@override@HiveField(4)@JsonKey(name: 'download_url') final  String? downloadUrl;
 @override@JsonKey(name: 'created_at') final  DateTime? createdAt;
-@override@JsonKey(name: 'episode_number') final  int? episodeNumber;
+@override@HiveField(5)@JsonKey(name: 'episode_number') final  int? episodeNumber;
 
 /// Create a copy of MediaFile
 /// with the given fields replaced by the non-null parameter values.
@@ -567,7 +567,7 @@ abstract mixin class _$MediaFileCopyWith<$Res> implements $MediaFileCopyWith<$Re
   factory _$MediaFileCopyWith(_MediaFile value, $Res Function(_MediaFile) _then) = __$MediaFileCopyWithImpl;
 @override @useResult
 $Res call({
- String id,@JsonKey(name: 'media_id') String mediaId, int? season, String? label,@JsonKey(name: 'download_url') String? downloadUrl,@JsonKey(name: 'created_at') DateTime? createdAt,@JsonKey(name: 'episode_number') int? episodeNumber
+@HiveField(0) String id,@HiveField(1)@JsonKey(name: 'media_id') String mediaId,@HiveField(2) int? season,@HiveField(3) String? label,@HiveField(4)@JsonKey(name: 'download_url') String? downloadUrl,@JsonKey(name: 'created_at') DateTime? createdAt,@HiveField(5)@JsonKey(name: 'episode_number') int? episodeNumber
 });
 
 

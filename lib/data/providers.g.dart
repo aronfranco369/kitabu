@@ -9,45 +9,6 @@ part of 'providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(catalog)
-final catalogProvider = CatalogProvider._();
-
-final class CatalogProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Media>>,
-          List<Media>,
-          FutureOr<List<Media>>
-        >
-    with $FutureModifier<List<Media>>, $FutureProvider<List<Media>> {
-  CatalogProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'catalogProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$catalogHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<List<Media>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<Media>> create(Ref ref) {
-    return catalog(ref);
-  }
-}
-
-String _$catalogHash() => r'b60d96ab01d08dc74a6cedcdacc4de8722bafe90';
-
 @ProviderFor(mediaById)
 final mediaByIdProvider = MediaByIdFamily._();
 
@@ -97,7 +58,7 @@ final class MediaByIdProvider
   }
 }
 
-String _$mediaByIdHash() => r'2d3458890176c60377337a0449da2e67be528b3a';
+String _$mediaByIdHash() => r'f4f6f795ecddf4f4911e90958c2bf1db50fc54b7';
 
 final class MediaByIdFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<Media?>, String> {
@@ -154,10 +115,16 @@ final class HomeRowsProvider
   }
 }
 
-String _$homeRowsHash() => r'76c7c322b4da3cf42c5c4c36a4743cd9ef47af76';
+String _$homeRowsHash() => r'3951d2ef782d64ab2b9847d4a411c0d4a7bf69b1';
+
+/// Files for a specific media — reads from Hive via FilesNotifier.
+/// Triggers a background Supabase fetch on first access for this mediaId.
 
 @ProviderFor(mediaFiles)
 final mediaFilesProvider = MediaFilesFamily._();
+
+/// Files for a specific media — reads from Hive via FilesNotifier.
+/// Triggers a background Supabase fetch on first access for this mediaId.
 
 final class MediaFilesProvider
     extends
@@ -167,6 +134,8 @@ final class MediaFilesProvider
           FutureOr<List<MediaFile>>
         >
     with $FutureModifier<List<MediaFile>>, $FutureProvider<List<MediaFile>> {
+  /// Files for a specific media — reads from Hive via FilesNotifier.
+  /// Triggers a background Supabase fetch on first access for this mediaId.
   MediaFilesProvider._({
     required MediaFilesFamily super.from,
     required String super.argument,
@@ -211,7 +180,10 @@ final class MediaFilesProvider
   }
 }
 
-String _$mediaFilesHash() => r'e9bda10179fddc8b981782c2e186cf6010dbf3cb';
+String _$mediaFilesHash() => r'bdcb9d0a29dc670e1bcfab8abf0c44e0302a30da';
+
+/// Files for a specific media — reads from Hive via FilesNotifier.
+/// Triggers a background Supabase fetch on first access for this mediaId.
 
 final class MediaFilesFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<MediaFile>>, String> {
@@ -223,6 +195,9 @@ final class MediaFilesFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
+
+  /// Files for a specific media — reads from Hive via FilesNotifier.
+  /// Triggers a background Supabase fetch on first access for this mediaId.
 
   MediaFilesProvider call(String mediaId) =>
       MediaFilesProvider._(argument: mediaId, from: this);
@@ -286,7 +261,7 @@ final class RelatedMediaProvider
   }
 }
 
-String _$relatedMediaHash() => r'4c824b2bf75d1257a27b08538625a7f13aedb107';
+String _$relatedMediaHash() => r'c8693c66220808594197234e4ec66e1c93ea71cf';
 
 final class RelatedMediaFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<Media>>, String> {
@@ -343,7 +318,7 @@ final class FilterYearsProvider
   }
 }
 
-String _$filterYearsHash() => r'ea6aec26023d98c9d738469b1325dc0ae5e0298b';
+String _$filterYearsHash() => r'069fd4f40602b7fa8cb1fc2194c3e9fb6b4670ad';
 
 @ProviderFor(filterDjs)
 final filterDjsProvider = FilterDjsProvider._();
@@ -382,7 +357,7 @@ final class FilterDjsProvider
   }
 }
 
-String _$filterDjsHash() => r'79e13bc2fe28dc2b564d60ab1e25333e62a3ea6d';
+String _$filterDjsHash() => r'8181b3209bf9e65833bc649a197975879ed58d5f';
 
 @ProviderFor(filterCountries)
 final filterCountriesProvider = FilterCountriesProvider._();
@@ -421,7 +396,7 @@ final class FilterCountriesProvider
   }
 }
 
-String _$filterCountriesHash() => r'3bc1449d142249f88c6a6e16ced0c3aed4f347cd';
+String _$filterCountriesHash() => r'36d5c29170b4d9bbe96f84e50d77cd3f3e69eb2d';
 
 @ProviderFor(DiscoverFilters)
 final discoverFiltersProvider = DiscoverFiltersProvider._();
@@ -455,7 +430,7 @@ final class DiscoverFiltersProvider
   }
 }
 
-String _$discoverFiltersHash() => r'a61dd1b05b98de6e2c348cade0b6977b7bdfd6da';
+String _$discoverFiltersHash() => r'0e0b5e9ef40f23f535f50ca8efcdd88378360463';
 
 abstract class _$DiscoverFilters extends $Notifier<DiscoverFilter> {
   DiscoverFilter build();
@@ -512,7 +487,7 @@ final class DiscoverResultsProvider
   }
 }
 
-String _$discoverResultsHash() => r'5548191fc003f5d8bbc42d159d3f52ac95e6831d';
+String _$discoverResultsHash() => r'7e81b8077c926ccdfa83cdd65a4999e51954a6e4';
 
 @ProviderFor(SearchQuery)
 final searchQueryProvider = SearchQueryProvider._();
@@ -602,7 +577,7 @@ final class SearchResultsProvider
   }
 }
 
-String _$searchResultsHash() => r'c306197cfe686f964c7c409c42a526c5df16a038';
+String _$searchResultsHash() => r'0055a8ec593a45932df0b47e1bbf3bd89fa52eeb';
 
 @ProviderFor(Saved)
 final savedProvider = SavedProvider._();
@@ -692,7 +667,7 @@ final class SavedContentProvider
   }
 }
 
-String _$savedContentHash() => r'6ed2eee871d84a6a4b2fdef8a0929fab43b84365';
+String _$savedContentHash() => r'ed2dd00d30e96b614e3b4e5142468a92377ddd50';
 
 @ProviderFor(Recent)
 final recentProvider = RecentProvider._();
@@ -785,7 +760,7 @@ final class RecentContentProvider
   }
 }
 
-String _$recentContentHash() => r'012a0d84ad075f526861047ab04c89a1e525451c';
+String _$recentContentHash() => r'98ee8eaaa5e9f9bacb83f5bf482440a504d3e716';
 
 @ProviderFor(Downloads)
 final downloadsProvider = DownloadsProvider._();
@@ -878,7 +853,7 @@ final class DownloadsContentProvider
   }
 }
 
-String _$downloadsContentHash() => r'e47407c85c122b3bcd4939aa9eed263868454964';
+String _$downloadsContentHash() => r'1f6c513eee5039ac3f03f5bb8a90089f7ce102b0';
 
 @ProviderFor(Requests)
 final requestsProvider = RequestsProvider._();

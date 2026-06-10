@@ -4,10 +4,13 @@
 
 import 'package:hive_ce/hive_ce.dart';
 import 'package:kitabu/models/library_item.dart';
+import 'package:kitabu/models/media.dart';
 
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
     registerAdapter(DownloadItemAdapter());
+    registerAdapter(MediaFileHiveAdapter());
+    registerAdapter(MediaHiveAdapter());
     registerAdapter(WatchedItemAdapter());
   }
 }
@@ -15,6 +18,8 @@ extension HiveRegistrar on HiveInterface {
 extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(DownloadItemAdapter());
+    registerAdapter(MediaFileHiveAdapter());
+    registerAdapter(MediaHiveAdapter());
     registerAdapter(WatchedItemAdapter());
   }
 }

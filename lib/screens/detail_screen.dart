@@ -49,7 +49,6 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
       await _initPlayer(url);
       // TODO: [DO NOT TOUCH] After player initializes, increment view_count on Supabase for widget.contentId.
       // Use: supabase.rpc('increment_view_count', params: {'media_id': widget.contentId}) or a direct UPDATE.
-      // Only fire once per session open, not on file switches.
       // TODO: [DO NOT TOUCH] After player initializes, restore saved playback position for the first file
       // from Hive (box: 'watch_progress', key: '${widget.contentId}_0'). Seek _vpc to saved Duration.
     } catch (_) {
@@ -239,8 +238,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                   ),
 
                   // While files are fetching for a series, show skeleton episodes
-                  if (isFilesLoading)
-                    const SliverToBoxAdapter(child: EpisodesSkeleton()),
+                  if (isFilesLoading) const SliverToBoxAdapter(child: EpisodesSkeleton()),
 
                   // Episodes header (pinned)
                   if (hasFiles)
@@ -577,20 +575,11 @@ class _RelatedGrid extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 0.62,
-              ),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 0.62),
               itemCount: related.length,
               itemBuilder: (context, i) => LayoutBuilder(
-                builder: (context, constraints) => PosterCard(
-                  media: related[i],
-                  width: constraints.maxWidth,
-                  height: constraints.maxHeight,
-                  onTap: () => context.pushReplacement('/detail/${related[i].id}'),
-                ),
+                builder: (context, constraints) =>
+                    PosterCard(media: related[i], width: constraints.maxWidth, height: constraints.maxHeight, onTap: () => context.pushReplacement('/detail/${related[i].id}')),
               ),
             ),
           ],
