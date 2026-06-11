@@ -50,3 +50,6 @@ GoogleService-Info.plist
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Scratch SVG tooling
+.tmp_svg/

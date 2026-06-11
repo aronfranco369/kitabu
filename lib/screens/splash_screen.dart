@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import '../data/fcm_service.dart';
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -15,7 +16,15 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(const Duration(milliseconds: 2800), () {
-      if (mounted) context.go('/home');
+      if (!mounted) return;
+      context.go('/home');
+      // If the app was launched by tapping a notification, deep link now that
+      // the home stack exists.
+      final pendingId = pendingNotificationMediaId;
+      if (pendingId != null && pendingId.isNotEmpty) {
+        pendingNotificationMediaId = null;
+        context.push('/detail/$pendingId');
+      }
     });
   }
 

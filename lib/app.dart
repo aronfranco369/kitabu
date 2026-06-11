@@ -13,7 +13,7 @@ import 'screens/search_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/bottom_nav_bar.dart';
 
-final _router = GoRouter(
+final appRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
     GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
@@ -50,7 +50,7 @@ class SinemaxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(title: 'SINEMAX', debugShowCheckedModeBanner: false, theme: buildSinemaxTheme(), routerConfig: _router);
+    return MaterialApp.router(title: 'SINEMAX', debugShowCheckedModeBanner: false, theme: buildSinemaxTheme(), routerConfig: appRouter);
   }
 }
 
@@ -66,9 +66,7 @@ class _AppShellState extends State<_AppShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) FcmService.init(context);
-    });
+    FcmService.init();
   }
 
   Future<void> _onBack(BuildContext context) async {
